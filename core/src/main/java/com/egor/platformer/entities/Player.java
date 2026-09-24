@@ -62,7 +62,7 @@ public class Player {
     private boolean onGround;
     private boolean facingRight = true;
 
-    private int hp = MAX_HP;
+    private float hp = MAX_HP;
     private float invulnerableTimer;
 
     private float anxiety = ANXIETY_START;
@@ -106,7 +106,7 @@ public class Player {
     public float getY() { return y; }
     public float getCenterX() { return x + SIZE / 2f; }
     public float getCenterY() { return y + SIZE / 2f; }
-    public int getHp() { return hp; }
+    public int getHp() { return (int) hp; }
     public boolean isFacingRight() { return facingRight; }
     public boolean isAttacking() { return attacking; }
     public boolean isDashing() { return dashing; }
