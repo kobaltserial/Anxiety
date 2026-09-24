@@ -3,6 +3,7 @@ package com.egor.platformer.entities;
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.Input;
 import com.badlogic.gdx.math.Rectangle;
+import com.badlogic.gdx.math.MathUtils;
 
 import java.util.List;
 
@@ -31,11 +32,23 @@ public class Player {
 
     private static final float ATTACK_WIDTH = 55f;
     private static final float ATTACK_HEIGHT = 50f;
-
     private static final float INVULNERABLE_TIME = 1.2f;
-
-    // Vertical position below which the player is considered to have fallen out of the world.
     private static final float DEATH_Y = -100f;
+
+    private static final float ANXIETY_MAX = 100f;
+    private static final float ANXIETY_START = 50f;
+
+    // Per-second rate while the player is moving.
+    private static final float ANXIETY_GAIN_MOVE = 5f;
+
+    // Per-second loss while standing still. Must be larger than the gain,
+// otherwise the player could idle forever without dying.
+    private static final float ANXIETY_LOSS_IDLE = 10f;
+
+    // Instant bumps added on specific actions.
+    private static final float ANXIETY_GAIN_JUMP = 10f;
+    private static final float ANXIETY_GAIN_DASH = 15f;
+    private static final float ANXIETY_GAIN_ATTACK = 10f;
 
     private float x;
     private float y;
@@ -46,6 +59,9 @@ public class Player {
 
     private int hp = MAX_HP;
     private float invulnerableTimer;
+
+    private float anxiety = ANXIETY_START;
+    private boolean anxietyDeath;
 
     private boolean dashing;
     private float dashTimer;
@@ -129,6 +145,14 @@ public class Player {
         return invulnerableTimer;
     }
 
+    public float getAnxiety() {
+        return anxiety;
+    }
+
+    public boolean isAnxietyDeath() {
+        return anxietyDeath;
+    }
+
     public boolean isOnGround() {
         return onGround;
     }
@@ -200,6 +224,8 @@ public class Player {
         attackCooldownTimer = 0f;
         invulnerableTimer = 0f;
         hp = MAX_HP;
+        anxiety = ANXIETY_START;
+        anxietyDeath = false;
         pendingRespawn = false;
     }
 
@@ -214,6 +240,7 @@ public class Player {
     public void update(float delta, List<Platform> platforms) {
         handleInput(delta);
         updateTimers(delta);
+        updateAnxiety(delta);
         applyPhysics(delta, platforms);
         checkOutOfBounds();
     }
@@ -244,6 +271,7 @@ public class Player {
         if (Gdx.input.isKeyJustPressed(Input.Keys.SPACE) && onGround && !dashing) {
             velocityY = JUMP_FORCE;
             onGround = false;
+            anxiety = Math.min(ANXIETY_MAX, anxiety + ANXIETY_GAIN_JUMP);
         }
     }
 
@@ -256,6 +284,7 @@ public class Player {
         dashCooldownTimer = DASH_COOLDOWN;
         dashDirection = facingRight ? 1f : -1f;
         dashJustStarted = true;
+        anxiety = Math.min(ANXIETY_MAX, anxiety + ANXIETY_GAIN_DASH);
     }
 
     private void tryStartAttack() {
@@ -267,6 +296,7 @@ public class Player {
         attackCooldownTimer = ATTACK_COOLDOWN;
         attackDirection = facingRight ? 1f : -1f;
         attackHitApplied = false;
+        anxiety = Math.min(ANXIETY_MAX, anxiety + ANXIETY_GAIN_ATTACK);
     }
 
     private void updateTimers(float delta) {
@@ -279,6 +309,24 @@ public class Player {
             if (attackTimer <= 0f) {
                 attacking = false;
             }
+        }
+    }
+
+    private void updateAnxiety(float delta) {
+        if (anxietyDeath) return;
+
+        boolean moving = Math.abs(velocityX) > 1f || !onGround || dashing;
+
+        if (moving) {
+            anxiety += ANXIETY_GAIN_MOVE * delta;
+        } else {
+            anxiety -= ANXIETY_LOSS_IDLE * delta;
+        }
+
+        anxiety = MathUtils.clamp(anxiety, 0f, ANXIETY_MAX);
+
+        if (anxiety <= 0f) {
+            anxietyDeath = true;
         }
     }
 
@@ -346,6 +394,9 @@ public class Player {
 
     private void checkOutOfBounds() {
         if (y < DEATH_Y) {
+            pendingRespawn = true;
+        }
+        if (anxietyDeath) {
             pendingRespawn = true;
         }
     }
