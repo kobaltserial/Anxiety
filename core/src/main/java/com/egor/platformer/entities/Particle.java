@@ -1,4 +1,4 @@
-package com.egor.platformer;
+package com.egor.platformer.entities;
 
 import com.badlogic.gdx.math.MathUtils;
 

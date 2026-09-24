@@ -1,6 +1,7 @@
 package com.egor.platformer;
 
 import com.badlogic.gdx.Game;
+import com.egor.platformer.screens.MenuScreen;
 
 /**
  * Entry point of the game. Delegates control to the active {@link com.badlogic.gdx.Screen}.

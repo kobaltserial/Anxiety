@@ -1,4 +1,4 @@
-package com.egor.platformer;
+package com.egor.platformer.screens;
 
 import com.badlogic.gdx.Game;
 import com.badlogic.gdx.Gdx;
@@ -13,17 +13,18 @@ import com.badlogic.gdx.utils.viewport.FitViewport;
 import com.badlogic.gdx.utils.viewport.Viewport;
 
 /**
- * Main menu. Lets the player start a new game or exit.
- * Uses keyboard navigation for now; mouse support comes later with proper UI.
+ * Pause overlay shown on top of the game screen.
+ * Keeps a reference to the game screen so "Resume" can return to the exact same state.
  */
-public class MenuScreen implements Screen {
+public class PauseScreen implements Screen {
 
     private static final float VIEWPORT_WIDTH = 1280f;
     private static final float VIEWPORT_HEIGHT = 720f;
 
-    private static final String[] ITEMS = {"Start Game", "Exit"};
+    private static final String[] ITEMS = {"Resume", "Restart", "Main Menu"};
 
     private final Game game;
+    private final GameScreen gameScreen;
 
     private OrthographicCamera camera;
     private Viewport viewport;
@@ -33,8 +34,9 @@ public class MenuScreen implements Screen {
 
     private int selectedIndex = 0;
 
-    public MenuScreen(Game game) {
+    public PauseScreen(Game game, GameScreen gameScreen) {
         this.game = game;
+        this.gameScreen = gameScreen;
     }
 
     @Override
@@ -65,13 +67,18 @@ public class MenuScreen implements Screen {
         if (Gdx.input.isKeyJustPressed(Input.Keys.ENTER) || Gdx.input.isKeyJustPressed(Input.Keys.SPACE)) {
             confirm();
         }
+        if (Gdx.input.isKeyJustPressed(Input.Keys.ESCAPE)) {
+            game.setScreen(gameScreen);
+        }
     }
 
     private void confirm() {
         if (selectedIndex == 0) {
+            game.setScreen(gameScreen);
+        } else if (selectedIndex == 1) {
             game.setScreen(new GameScreen(game));
         } else {
-            Gdx.app.exit();
+            game.setScreen(new MenuScreen(game));
         }
     }
 
@@ -79,18 +86,15 @@ public class MenuScreen implements Screen {
         Gdx.gl.glClearColor(0.05f, 0.05f, 0.08f, 1f);
         Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT);
 
-        // Center the viewport so the menu is not stuck in a corner on wide windows.
         viewport.apply(true);
         camera.update();
         shapeRenderer.setProjectionMatrix(camera.combined);
         batch.setProjectionMatrix(camera.combined);
 
-        // A subtle colored panel behind the menu items.
         shapeRenderer.begin(ShapeRenderer.ShapeType.Filled);
         shapeRenderer.setColor(0.12f, 0.12f, 0.18f, 1f);
         shapeRenderer.rect(340f, 180f, 600f, 380f);
 
-        // Highlight bar behind the selected item.
         float itemHeight = 60f;
         float itemsStartY = 460f;
         float highlightY = itemsStartY - selectedIndex * itemHeight - 10f;
@@ -99,19 +103,15 @@ public class MenuScreen implements Screen {
         shapeRenderer.end();
 
         batch.begin();
-        font.setColor(1f, 1f, 1f, 1f);
-
-        // Title.
         font.getData().setScale(4f);
-        font.draw(batch, "ANXIETY", 520f, 640f);
+        font.setColor(1f, 1f, 1f, 1f);
+        font.draw(batch, "PAUSED", 490f, 640f);
 
-        // Menu items.
         font.getData().setScale(2.5f);
         for (int i = 0; i < ITEMS.length; i++) {
             float y = itemsStartY - i * itemHeight + 30f;
             font.draw(batch, ITEMS[i], 420f, y);
         }
-
         batch.end();
     }
 

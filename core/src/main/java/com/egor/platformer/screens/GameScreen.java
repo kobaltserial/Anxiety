@@ -1,4 +1,4 @@
-package com.egor.platformer;
+package com.egor.platformer.screens;
 
 import com.badlogic.gdx.Game;
 import com.badlogic.gdx.Gdx;
@@ -12,6 +12,10 @@ import com.badlogic.gdx.math.MathUtils;
 import com.badlogic.gdx.math.Rectangle;
 import com.badlogic.gdx.utils.viewport.FitViewport;
 import com.badlogic.gdx.utils.viewport.Viewport;
+import com.egor.platformer.entities.Checkpoint;
+import com.egor.platformer.entities.Enemy;
+import com.egor.platformer.entities.Particle;
+import com.egor.platformer.entities.Platform;
 
 import java.util.ArrayList;
 import java.util.Iterator;
