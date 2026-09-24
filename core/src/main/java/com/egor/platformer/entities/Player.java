@@ -2,8 +2,9 @@ package com.egor.platformer.entities;
 
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.Input;
-import com.badlogic.gdx.math.Rectangle;
+import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
 import com.badlogic.gdx.math.MathUtils;
+import com.badlogic.gdx.math.Rectangle;
 
 import java.util.List;
 
@@ -29,26 +30,26 @@ public class Player {
     private static final float ATTACK_STRIKE = 0.12f;
     private static final float ATTACK_TOTAL = ATTACK_WINDUP + ATTACK_STRIKE;
     private static final float ATTACK_COOLDOWN = 0.35f;
-
     private static final float ATTACK_WIDTH = 55f;
     private static final float ATTACK_HEIGHT = 50f;
+
     private static final float INVULNERABLE_TIME = 1.2f;
     private static final float DEATH_Y = -100f;
 
     private static final float ANXIETY_MAX = 100f;
     private static final float ANXIETY_START = 50f;
-
-    // Per-second rate while the player is moving.
     private static final float ANXIETY_GAIN_MOVE = 5f;
-
-    // Per-second loss while standing still. Must be larger than the gain,
-// otherwise the player could idle forever without dying.
     private static final float ANXIETY_LOSS_IDLE = 10f;
-
-    // Instant bumps added on specific actions.
     private static final float ANXIETY_GAIN_JUMP = 10f;
     private static final float ANXIETY_GAIN_DASH = 15f;
     private static final float ANXIETY_GAIN_ATTACK = 10f;
+
+    private static final float GLOW_COLOR_R = 1f;
+    private static final float GLOW_COLOR_G = 0.95f;
+    private static final float GLOW_COLOR_B = 0.4f;
+    private static final float GLOW_ALPHA_MAX = 0.45f;
+    private static final float GLOW_OUTER_RADIUS = 18f;
+    private static final float GLOW_INNER_RADIUS = 10f;
 
     private float x;
     private float y;
@@ -76,19 +77,12 @@ public class Player {
     private boolean attackHitApplied;
 
     private boolean wasOnGroundLastFrame;
-
-    // Set to true by the world when the player took a fatal hit or fell out of bounds.
-    // The screen reads this flag and respawns the player.
     private boolean pendingRespawn;
 
     public Player(float x, float y) {
         this.x = x;
         this.y = y;
     }
-
-    // ------------------------------------------------------------------
-    // Public queries
-    // ------------------------------------------------------------------
 
     public Rectangle bounds() {
         return new Rectangle(x, y, SIZE, SIZE);
@@ -101,96 +95,31 @@ public class Player {
         return new Rectangle(ax, ay, ATTACK_WIDTH, ATTACK_HEIGHT);
     }
 
-    public float getX() {
-        return x;
-    }
-
-    public float getY() {
-        return y;
-    }
-
-    public float getCenterX() {
-        return x + SIZE / 2f;
-    }
-
-    public float getCenterY() {
-        return y + SIZE / 2f;
-    }
-
-    public int getHp() {
-        return hp;
-    }
-
-    public boolean isFacingRight() {
-        return facingRight;
-    }
-
-    public boolean isAttacking() {
-        return attacking;
-    }
-
-    public boolean isDashing() {
-        return dashing;
-    }
-
-    public float getAttackTimer() {
-        return attackTimer;
-    }
-
-    public float getAttackDirection() {
-        return attackDirection;
-    }
-
-    public float getInvulnerableTimer() {
-        return invulnerableTimer;
-    }
-
-    public float getAnxiety() {
-        return anxiety;
-    }
-
-    public boolean isAnxietyDeath() {
-        return anxietyDeath;
-    }
-
-    public boolean isOnGround() {
-        return onGround;
-    }
-
-    public boolean isAttackHitApplied() {
-        return attackHitApplied;
-    }
-
-    public boolean isStrikeActive() {
-        return attacking && attackTimer <= ATTACK_STRIKE;
-    }
-
-    public boolean isPendingRespawn() {
-        return pendingRespawn;
-    }
-
-    public boolean wasOnGroundLastFrame() {
-        return wasOnGroundLastFrame;
-    }
-
-    public boolean justLanded() {
-        return onGround && !wasOnGroundLastFrame;
-    }
-
-    public float getVelocityX() {
-        return velocityX;
-    }
-    public boolean isDashJustStarted() {
-        return dashJustStarted;
-    }
+    public float getX() { return x; }
+    public float getY() { return y; }
+    public float getCenterX() { return x + SIZE / 2f; }
+    public float getCenterY() { return y + SIZE / 2f; }
+    public int getHp() { return hp; }
+    public boolean isFacingRight() { return facingRight; }
+    public boolean isAttacking() { return attacking; }
+    public boolean isDashing() { return dashing; }
+    public float getAttackTimer() { return attackTimer; }
+    public float getAttackDirection() { return attackDirection; }
+    public float getInvulnerableTimer() { return invulnerableTimer; }
+    public float getAnxiety() { return anxiety; }
+    public boolean isAnxietyDeath() { return anxietyDeath; }
+    public boolean isOnGround() { return onGround; }
+    public boolean isAttackHitApplied() { return attackHitApplied; }
+    public boolean isStrikeActive() { return attacking && attackTimer <= ATTACK_STRIKE; }
+    public boolean isPendingRespawn() { return pendingRespawn; }
+    public boolean wasOnGroundLastFrame() { return wasOnGroundLastFrame; }
+    public boolean justLanded() { return onGround && !wasOnGroundLastFrame; }
+    public float getVelocityX() { return velocityX; }
+    public boolean isDashJustStarted() { return dashJustStarted; }
 
     public void clearDashJustStarted() {
         dashJustStarted = false;
     }
-
-    // ------------------------------------------------------------------
-    // Mutators used by the world
-    // ------------------------------------------------------------------
 
     public void markAttackHitApplied() {
         attackHitApplied = true;
@@ -229,14 +158,6 @@ public class Player {
         pendingRespawn = false;
     }
 
-    // ------------------------------------------------------------------
-    // Frame update
-    // ------------------------------------------------------------------
-
-    /**
-     * Handles input, timers, physics and collision for the current frame.
-     * Called once per frame by the game screen.
-     */
     public void update(float delta, List<Platform> platforms) {
         handleInput(delta);
         updateTimers(delta);
@@ -401,20 +322,14 @@ public class Player {
         }
     }
 
-    /**
-     * Draws the player using the given shape renderer.
-     * The caller is responsible for begin()/end() around the call is NOT
-     * needed: this method manages its own ShapeRenderer.begin/end block.
-     */
-    public void draw(com.badlogic.gdx.graphics.glutils.ShapeRenderer shapeRenderer) {
+    public void draw(ShapeRenderer shapeRenderer) {
         float centerX = getCenterX();
         float bottomY = y;
 
-        // While invulnerable, blink so the player can read the damage state.
         float alpha = 1f;
         if (dashing) alpha = 0.6f;
         if (invulnerableTimer > 0f) {
-            alpha = 0.4f + 0.6f * Math.abs(com.badlogic.gdx.math.MathUtils.sin(invulnerableTimer * 20f));
+            alpha = 0.4f + 0.6f * Math.abs(MathUtils.sin(invulnerableTimer * 20f));
         }
 
         float cloakR = 0.15f, cloakG = 0.15f, cloakB = 0.20f;
@@ -422,7 +337,22 @@ public class Player {
         float hornR = 0.65f, hornG = 0.65f, hornB = 0.60f;
         float nailR = 0.75f, nailG = 0.75f, nailB = 0.70f;
 
-        shapeRenderer.begin(com.badlogic.gdx.graphics.glutils.ShapeRenderer.ShapeType.Filled);
+        shapeRenderer.begin(ShapeRenderer.ShapeType.Filled);
+
+        // Linear alpha so every point of anxiety is visibly brighter than the last.
+        float anxietyRatio = anxiety / ANXIETY_MAX;
+        float glowAlpha = anxietyRatio * GLOW_ALPHA_MAX;
+        if (glowAlpha > 0f) {
+            float glowX = centerX;
+            float glowY = bottomY + 30f;
+
+            shapeRenderer.setColor(GLOW_COLOR_R, GLOW_COLOR_G, GLOW_COLOR_B, glowAlpha * 0.5f);
+            shapeRenderer.circle(glowX, glowY, GLOW_OUTER_RADIUS);
+
+            shapeRenderer.setColor(GLOW_COLOR_R, GLOW_COLOR_G, GLOW_COLOR_B, glowAlpha);
+            shapeRenderer.circle(glowX, glowY, GLOW_INNER_RADIUS);
+        }
+
         shapeRenderer.setColor(cloakR, cloakG, cloakB, alpha);
         shapeRenderer.rect(centerX - 15f, bottomY, 30f, 40f);
 
@@ -445,11 +375,7 @@ public class Player {
         shapeRenderer.end();
     }
 
-    /**
-     * Draws the nail in one of three states: idle (at the side), windup
-     * (raised above the head) or strike (slammed forward and down).
-     */
-    private void drawSword(com.badlogic.gdx.graphics.glutils.ShapeRenderer shapeRenderer,
+    private void drawSword(ShapeRenderer shapeRenderer,
                            float centerX, float bottomY, float alpha,
                            float r, float g, float b) {
         shapeRenderer.setColor(r, g, b, alpha);

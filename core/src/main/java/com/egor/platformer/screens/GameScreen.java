@@ -49,7 +49,6 @@ public class GameScreen implements Screen {
     private static final float HP_BAR_GAP = 8f;
     private static final int HP_BARS_COUNT = 5;
 
-    // Anxiety bar sits directly below the HP bars.
     private static final float ANXIETY_BAR_Y = 615f;
     private static final float ANXIETY_BAR_HEIGHT = 20f;
 
@@ -210,10 +209,6 @@ public class GameScreen implements Screen {
             runDustTimer = 0f;
         }
 
-        if (player.isDashing() && player.wasOnGroundLastFrame() && !wasOnGroundLastFrame) {
-            // no-op; placeholder for future dash-on-ground particles
-        }
-
         wasOnGroundLastFrame = player.isOnGround();
     }
 
@@ -333,6 +328,7 @@ public class GameScreen implements Screen {
         drawPlayerHud();
         drawAnxietyBar();
     }
+
     private void drawPlatforms() {
         shapeRenderer.begin(ShapeType.Filled);
         shapeRenderer.setColor(0.3f, 0.25f, 0.2f, 1f);
@@ -430,12 +426,9 @@ public class GameScreen implements Screen {
         float totalWidth = HP_BARS_COUNT * HP_BAR_WIDTH + (HP_BARS_COUNT - 1) * HP_BAR_GAP;
         float fraction = player.getAnxiety() / 100f;
 
-        // Background of the bar.
         shapeRenderer.setColor(0.15f, 0.15f, 0.15f, 0.8f);
         shapeRenderer.rect(HP_BAR_X - 2f, ANXIETY_BAR_Y - 2f, totalWidth + 4f, ANXIETY_BAR_HEIGHT + 4f);
 
-        // Fill color depends on the level: red near death, orange near overload,
-        // yellow in the safe middle.
         float a = player.getAnxiety();
         if (a < 15f) {
             shapeRenderer.setColor(0.9f, 0.2f, 0.2f, 1f);
