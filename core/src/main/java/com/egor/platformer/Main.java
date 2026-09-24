@@ -2,8 +2,11 @@ package com.egor.platformer;
 
 import com.badlogic.gdx.Game;
 
-/** {@link com.badlogic.gdx.ApplicationListener} implementation shared by all platforms. */
+/**
+ * Entry point of the game. Delegates control to the active {@link com.badlogic.gdx.Screen}.
+ */
 public class Main extends Game {
+
     @Override
     public void create() {
         setScreen(new GameScreen());
