@@ -108,6 +108,15 @@ public class Player {
     public float getInvulnerableTimer() { return invulnerableTimer; }
     public float getAnxiety() { return anxiety; }
     public boolean isAnxietyDeath() { return anxietyDeath; }
+
+    public float getDamageMultiplier() {
+        if (anxiety < 30f) return 1.0f;
+        if (anxiety < 50f) return 1.2f;
+        if (anxiety < 70f) return 1.5f;
+        if (anxiety < 90f) return 2.0f;
+        return 2.5f;
+    }
+
     public boolean isOnGround() { return onGround; }
     public boolean isAttackHitApplied() { return attackHitApplied; }
     public boolean isStrikeActive() { return attacking && attackTimer <= ATTACK_STRIKE; }

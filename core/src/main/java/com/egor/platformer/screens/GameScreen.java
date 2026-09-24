@@ -162,7 +162,8 @@ public class GameScreen implements Screen {
 
             for (Enemy enemy : enemies) {
                 if (attack.overlaps(enemy.bounds())) {
-                    enemy.takeDamage(ENEMY_DAMAGE);
+                    int damage = (int) (ENEMY_DAMAGE * player.getDamageMultiplier());
+                    enemy.takeDamage(damage);
                     emitAttackHit(enemy);
                     player.markAttackHitApplied();
                     break;
