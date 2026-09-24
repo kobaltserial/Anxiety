@@ -36,9 +36,12 @@ public class GameScreen implements Screen {
     private static final float DASH_DURATION = 0.15f;
     private static final float DASH_COOLDOWN = 0.4f;
 
-    private static final float DEATH_Y = -100f;
+    private static final float ATTACK_DURATION = 0.15f;
+    private static final float ATTACK_COOLDOWN = 0.35f;
+    private static final float ATTACK_WIDTH = 55f;
+    private static final float ATTACK_HEIGHT = 40f;
 
-    // Interval between dust emissions while running on the ground.
+    private static final float DEATH_Y = -100f;
     private static final float RUN_DUST_INTERVAL = 0.08f;
 
     private float playerX = 300f;
@@ -53,7 +56,11 @@ public class GameScreen implements Screen {
     private float dashCooldownTimer = 0f;
     private float dashDirection = 1f;
 
-    // Tracks the previous grounded state so landing dust is emitted only on the frame we touch down.
+    private boolean isAttacking = false;
+    private float attackTimer = 0f;
+    private float attackCooldownTimer = 0f;
+    private float attackDirection = 1f;
+
     private boolean wasOnGroundLastFrame = false;
     private float runDustTimer = 0f;
 
@@ -101,6 +108,10 @@ public class GameScreen implements Screen {
             tryStartDash();
         }
 
+        if (Gdx.input.isKeyJustPressed(Input.Keys.P)) {
+            tryStartAttack();
+        }
+
         if (!isDashing) {
             velocityX = 0f;
 
@@ -133,14 +144,30 @@ public class GameScreen implements Screen {
         dashCooldownTimer = DASH_COOLDOWN;
         dashDirection = facingRight ? 1f : -1f;
 
-        // Dash trail is emitted in one burst at the start of the dash
-        // so the effect is tied to the action, not the frame rate.
         emitDashTrail();
     }
 
+    private void tryStartAttack() {
+        if (isAttacking) return;
+        if (attackCooldownTimer > 0f) return;
+
+        isAttacking = true;
+        attackTimer = ATTACK_DURATION;
+        attackCooldownTimer = ATTACK_COOLDOWN;
+        attackDirection = facingRight ? 1f : -1f;
+
+        emitAttackSpark();
+    }
+
     private void applyPhysics(float delta) {
-        if (dashCooldownTimer > 0f) {
-            dashCooldownTimer -= delta;
+        if (dashCooldownTimer > 0f) dashCooldownTimer -= delta;
+        if (attackCooldownTimer > 0f) attackCooldownTimer -= delta;
+
+        if (isAttacking) {
+            attackTimer -= delta;
+            if (attackTimer <= 0f) {
+                isAttacking = false;
+            }
         }
 
         if (isDashing) {
@@ -214,13 +241,18 @@ public class GameScreen implements Screen {
         return new Rectangle(playerX, playerY, PLAYER_SIZE, PLAYER_SIZE);
     }
 
+    private Rectangle attackBounds() {
+        float centerY = playerY + PLAYER_SIZE / 2f;
+        float x = attackDirection > 0 ? playerX + PLAYER_SIZE : playerX - ATTACK_WIDTH;
+        float y = centerY - ATTACK_HEIGHT / 2f;
+        return new Rectangle(x, y, ATTACK_WIDTH, ATTACK_HEIGHT);
+    }
+
     private void emitMovementParticles(float delta) {
-        // Landing dust: emitted only on the frame the player transitions from air to ground.
         if (isOnGround && !wasOnGroundLastFrame) {
             emitLandingDust();
         }
 
-        // Running dust: emitted on a timer while grounded and moving.
         if (isOnGround && Math.abs(velocityX) > 1f && !isDashing) {
             runDustTimer -= delta;
             if (runDustTimer <= 0f) {
@@ -269,14 +301,11 @@ public class GameScreen implements Screen {
         float centerX = playerX + PLAYER_SIZE / 2f;
         float centerY = playerY + PLAYER_SIZE / 2f;
 
-        // Trail is made of many small particles with random offsets and lifetimes,
-        // so it reads as a soft motion blur instead of a stack of blocks.
         for (int i = 0; i < 15; i++) {
-            float t = i / 14f; // 0 at the front of the trail, 1 at the tail
+            float t = i / 14f;
             float offsetX = -dashDirection * (10f + t * 45f);
             float offsetY = MathUtils.random(-18f, 18f);
 
-            // Smaller and longer-lived particles near the player, fading out at the tail.
             float size = MathUtils.random(3f, 6f) * (1f - t * 0.5f);
             float life = MathUtils.random(0.12f, 0.22f) * (1f - t * 0.4f);
 
@@ -286,6 +315,26 @@ public class GameScreen implements Screen {
                 size,
                 life,
                 0.85f, 0.85f, 0.80f
+            ));
+        }
+    }
+
+    private void emitAttackSpark() {
+        float centerX = playerX + PLAYER_SIZE / 2f;
+        float centerY = playerY + PLAYER_SIZE / 2f;
+
+        float baseX = centerX + attackDirection * 25f;
+
+        for (int i = 0; i < 6; i++) {
+            float dirX = attackDirection * MathUtils.random(60f, 160f);
+            float dirY = MathUtils.random(-60f, 60f);
+
+            particles.add(new Particle(
+                baseX, centerY + MathUtils.random(-15f, 15f),
+                dirX, dirY,
+                MathUtils.random(2f, 4f),
+                MathUtils.random(0.1f, 0.2f),
+                1f, 1f, 0.9f
             ));
         }
     }
@@ -308,7 +357,9 @@ public class GameScreen implements Screen {
         velocityY = 0f;
         isOnGround = false;
         isDashing = false;
+        isAttacking = false;
         dashCooldownTimer = 0f;
+        attackCooldownTimer = 0f;
         particles.clear();
     }
 
@@ -333,7 +384,6 @@ public class GameScreen implements Screen {
         viewport.apply();
         shapeRenderer.setProjectionMatrix(camera.combined);
 
-        // Platforms.
         shapeRenderer.begin(ShapeType.Filled);
         shapeRenderer.setColor(0.3f, 0.25f, 0.2f, 1f);
         for (Platform platform : platforms) {
@@ -342,9 +392,7 @@ public class GameScreen implements Screen {
         }
         shapeRenderer.end();
 
-        // Particles on top of platforms but below the player, so the knight is always visible.
         drawParticles();
-
         drawPlayer();
     }
 
@@ -373,9 +421,12 @@ public class GameScreen implements Screen {
         shapeRenderer.setColor(cloakR, cloakG, cloakB, alpha);
         shapeRenderer.rect(centerX - 15f, bottomY, 30f, 40f);
 
-        float nailX = facingRight ? centerX + 12f : centerX - 20f;
+        // Nail position shifts while attacking: it thrusts forward in the attack direction.
+        float nailOffset = isAttacking ? 30f : 12f;
+        float nailX = facingRight ? centerX + nailOffset : centerX - nailOffset - 8f;
+        float nailWidth = isAttacking ? 35f : 8f;
         shapeRenderer.setColor(nailR, nailG, nailB, alpha);
-        shapeRenderer.rect(nailX, bottomY + 15f, 8f, 25f);
+        shapeRenderer.rect(nailX, bottomY + 15f, nailWidth, 8f);
 
         shapeRenderer.setColor(maskR, maskG, maskB, alpha);
         shapeRenderer.circle(centerX, bottomY + 48f, 14f);
