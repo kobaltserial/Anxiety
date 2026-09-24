@@ -7,11 +7,13 @@ import com.badlogic.gdx.graphics.GL20;
 import com.badlogic.gdx.graphics.OrthographicCamera;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer.ShapeType;
+import com.badlogic.gdx.math.MathUtils;
 import com.badlogic.gdx.math.Rectangle;
 import com.badlogic.gdx.utils.viewport.FitViewport;
 import com.badlogic.gdx.utils.viewport.Viewport;
 
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.List;
 
 /**
@@ -30,13 +32,14 @@ public class GameScreen implements Screen {
     private static final float GRAVITY = -1500f;
     private static final float JUMP_FORCE = 700f;
 
-    // Dash tuning. Duration is short so the movement feels like an impulse,
-    // not like a long slide.
     private static final float DASH_SPEED = 900f;
     private static final float DASH_DURATION = 0.15f;
     private static final float DASH_COOLDOWN = 0.4f;
 
     private static final float DEATH_Y = -100f;
+
+    // Interval between dust emissions while running on the ground.
+    private static final float RUN_DUST_INTERVAL = 0.08f;
 
     private float playerX = 300f;
     private float playerY = 300f;
@@ -50,7 +53,13 @@ public class GameScreen implements Screen {
     private float dashCooldownTimer = 0f;
     private float dashDirection = 1f;
 
+    // Tracks the previous grounded state so landing dust is emitted only on the frame we touch down.
+    private boolean wasOnGroundLastFrame = false;
+    private float runDustTimer = 0f;
+
     private final List<Platform> platforms = new ArrayList<>();
+    private final List<Particle> particles = new ArrayList<>();
+
     private ShapeRenderer shapeRenderer;
     private OrthographicCamera camera;
     private Viewport viewport;
@@ -81,12 +90,12 @@ public class GameScreen implements Screen {
     public void render(float delta) {
         handleInput(delta);
         applyPhysics(delta);
+        updateParticles(delta);
         updateCamera();
         draw();
     }
 
     private void handleInput(float delta) {
-        // Dash triggers before regular movement so its velocity overrides input.
         if (Gdx.input.isKeyJustPressed(Input.Keys.SHIFT_LEFT)
             || Gdx.input.isKeyJustPressed(Input.Keys.SHIFT_RIGHT)) {
             tryStartDash();
@@ -105,7 +114,6 @@ public class GameScreen implements Screen {
             }
         }
 
-        // isKeyJustPressed so the jump triggers once per press, not every frame.
         if (Gdx.input.isKeyJustPressed(Input.Keys.SPACE) && isOnGround && !isDashing) {
             velocityY = JUMP_FORCE;
             isOnGround = false;
@@ -124,6 +132,10 @@ public class GameScreen implements Screen {
         dashTimer = DASH_DURATION;
         dashCooldownTimer = DASH_COOLDOWN;
         dashDirection = facingRight ? 1f : -1f;
+
+        // Dash trail is emitted in one burst at the start of the dash
+        // so the effect is tied to the action, not the frame rate.
+        emitDashTrail();
     }
 
     private void applyPhysics(float delta) {
@@ -132,8 +144,6 @@ public class GameScreen implements Screen {
         }
 
         if (isDashing) {
-            // During a dash gravity is ignored and velocity is fixed,
-            // so the movement stays snappy and predictable.
             dashTimer -= delta;
 
             velocityX = DASH_SPEED * dashDirection;
@@ -147,13 +157,13 @@ public class GameScreen implements Screen {
             velocityY += GRAVITY * delta;
         }
 
-        // Collisions are resolved one axis at a time. Moving both at once
-        // causes the player to snag on platform edges or clip through on high speeds.
         playerX += velocityX * delta;
         resolveX();
 
         playerY += velocityY * delta;
         resolveY();
+
+        emitMovementParticles(delta);
 
         if (playerY < DEATH_Y) {
             respawn();
@@ -174,8 +184,6 @@ public class GameScreen implements Screen {
             }
             player.setPosition(playerX, playerY);
 
-            // A dash that hits a wall ends immediately. Without this the player
-            // would keep grinding against the wall for the rest of the dash.
             if (isDashing) {
                 isDashing = false;
                 velocityX = 0f;
@@ -206,6 +214,93 @@ public class GameScreen implements Screen {
         return new Rectangle(playerX, playerY, PLAYER_SIZE, PLAYER_SIZE);
     }
 
+    private void emitMovementParticles(float delta) {
+        // Landing dust: emitted only on the frame the player transitions from air to ground.
+        if (isOnGround && !wasOnGroundLastFrame) {
+            emitLandingDust();
+        }
+
+        // Running dust: emitted on a timer while grounded and moving.
+        if (isOnGround && Math.abs(velocityX) > 1f && !isDashing) {
+            runDustTimer -= delta;
+            if (runDustTimer <= 0f) {
+                runDustTimer = RUN_DUST_INTERVAL;
+                emitRunDust();
+            }
+        } else {
+            runDustTimer = 0f;
+        }
+
+        wasOnGroundLastFrame = isOnGround;
+    }
+
+    private void emitLandingDust() {
+        float centerX = playerX + PLAYER_SIZE / 2f;
+        float baseY = playerY;
+
+        for (int i = 0; i < 6; i++) {
+            float dirX = MathUtils.random(-1f, 1f);
+            float speed = MathUtils.random(80f, 180f);
+            particles.add(new Particle(
+                centerX, baseY,
+                dirX * speed, MathUtils.random(20f, 80f),
+                MathUtils.random(4f, 7f),
+                MathUtils.random(0.25f, 0.4f),
+                0.75f, 0.75f, 0.70f
+            ));
+        }
+    }
+
+    private void emitRunDust() {
+        float centerX = playerX + PLAYER_SIZE / 2f;
+        float baseY = playerY;
+
+        float dirX = -Math.signum(velocityX);
+        particles.add(new Particle(
+            centerX - dirX * 15f, baseY,
+            dirX * MathUtils.random(30f, 70f), MathUtils.random(10f, 40f),
+            MathUtils.random(3f, 5f),
+            MathUtils.random(0.2f, 0.3f),
+            0.6f, 0.6f, 0.55f
+        ));
+    }
+
+    private void emitDashTrail() {
+        float centerX = playerX + PLAYER_SIZE / 2f;
+        float centerY = playerY + PLAYER_SIZE / 2f;
+
+        // Trail is made of many small particles with random offsets and lifetimes,
+        // so it reads as a soft motion blur instead of a stack of blocks.
+        for (int i = 0; i < 15; i++) {
+            float t = i / 14f; // 0 at the front of the trail, 1 at the tail
+            float offsetX = -dashDirection * (10f + t * 45f);
+            float offsetY = MathUtils.random(-18f, 18f);
+
+            // Smaller and longer-lived particles near the player, fading out at the tail.
+            float size = MathUtils.random(3f, 6f) * (1f - t * 0.5f);
+            float life = MathUtils.random(0.12f, 0.22f) * (1f - t * 0.4f);
+
+            particles.add(new Particle(
+                centerX + offsetX, centerY + offsetY,
+                0f, MathUtils.random(-10f, 20f),
+                size,
+                life,
+                0.85f, 0.85f, 0.80f
+            ));
+        }
+    }
+
+    private void updateParticles(float delta) {
+        Iterator<Particle> it = particles.iterator();
+        while (it.hasNext()) {
+            Particle p = it.next();
+            p.update(delta);
+            if (p.isDead()) {
+                it.remove();
+            }
+        }
+    }
+
     private void respawn() {
         playerX = 300f;
         playerY = 300f;
@@ -214,6 +309,7 @@ public class GameScreen implements Screen {
         isOnGround = false;
         isDashing = false;
         dashCooldownTimer = 0f;
+        particles.clear();
     }
 
     private void updateCamera() {
@@ -237,6 +333,7 @@ public class GameScreen implements Screen {
         viewport.apply();
         shapeRenderer.setProjectionMatrix(camera.combined);
 
+        // Platforms.
         shapeRenderer.begin(ShapeType.Filled);
         shapeRenderer.setColor(0.3f, 0.25f, 0.2f, 1f);
         for (Platform platform : platforms) {
@@ -245,13 +342,20 @@ public class GameScreen implements Screen {
         }
         shapeRenderer.end();
 
-        // While dashing the knight fades slightly, so the movement reads as fast
-        // without adding particles yet.
-        if (isDashing) {
-            shapeRenderer.setColor(1f, 1f, 1f, 0.5f);
-        }
+        // Particles on top of platforms but below the player, so the knight is always visible.
+        drawParticles();
 
         drawPlayer();
+    }
+
+    private void drawParticles() {
+        shapeRenderer.begin(ShapeType.Filled);
+        for (Particle p : particles) {
+            float a = p.alpha();
+            shapeRenderer.setColor(p.r, p.g, p.b, a);
+            shapeRenderer.rect(p.x - p.size / 2f, p.y - p.size / 2f, p.size, p.size);
+        }
+        shapeRenderer.end();
     }
 
     private void drawPlayer() {
