@@ -1,5 +1,6 @@
 package com.egor.platformer;
 
+import com.badlogic.gdx.Game;
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.Input;
 import com.badlogic.gdx.Screen;
@@ -20,6 +21,8 @@ import java.util.List;
  * Main gameplay screen. Handles input, physics and rendering of the level.
  */
 public class GameScreen implements Screen {
+
+    private final Game game;
 
     private static final float VIEWPORT_WIDTH = 1280f;
     private static final float VIEWPORT_HEIGHT = 720f;
@@ -101,12 +104,23 @@ public class GameScreen implements Screen {
     private ShapeRenderer shapeRenderer;
     private OrthographicCamera camera;
     private Viewport viewport;
+    private OrthographicCamera hudCamera;
+
+    public GameScreen(Game game) {
+        this.game = game;
+    }
 
     @Override
     public void show() {
         shapeRenderer = new ShapeRenderer();
         camera = new OrthographicCamera();
         viewport = new FitViewport(VIEWPORT_WIDTH, VIEWPORT_HEIGHT, camera);
+        // resize() is not always called before the first render, so set the
+        // viewport size manually to match the current window.
+        viewport.update(Gdx.graphics.getWidth(), Gdx.graphics.getHeight(), true);
+        hudCamera = new OrthographicCamera();
+        hudCamera.setToOrtho(false, VIEWPORT_WIDTH, VIEWPORT_HEIGHT);
+        hudCamera.update();
         buildLevel();
     }
 
@@ -175,7 +189,7 @@ public class GameScreen implements Screen {
         }
 
         if (Gdx.input.isKeyJustPressed(Input.Keys.ESCAPE)) {
-            Gdx.app.exit();
+            game.setScreen(new PauseScreen(game, this));
         }
     }
 
@@ -527,16 +541,16 @@ public class GameScreen implements Screen {
         Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT);
 
         viewport.apply();
-        shapeRenderer.setProjectionMatrix(camera.combined);
 
+        shapeRenderer.setProjectionMatrix(camera.combined);
         drawPlatforms();
         drawCheckpoints();
         drawEnemies();
         drawParticles();
         drawPlayer();
-
-        // HUD is drawn last so it appears on top of everything.
         drawEnemyHpBars();
+
+        shapeRenderer.setProjectionMatrix(hudCamera.combined);
         drawPlayerHud();
     }
 
