@@ -21,6 +21,8 @@ public class Player {
     private static final float MOVE_SPEED = 300f;
     private static final float GRAVITY = -1500f;
     private static final float JUMP_FORCE = 700f;
+    private static final float AIR_JUMP_FORCE = 600f;
+    private static final int MAX_AIR_JUMPS = 1;
 
     private static final float DASH_SPEED = 900f;
     private static final float DASH_DURATION = 0.15f;
@@ -38,11 +40,11 @@ public class Player {
 
     private static final float ANXIETY_MAX = 100f;
     private static final float ANXIETY_START = 50f;
-    private static final float ANXIETY_GAIN_MOVE = 5f;
-    private static final float ANXIETY_LOSS_IDLE = 10f;
-    private static final float ANXIETY_GAIN_JUMP = 10f;
-    private static final float ANXIETY_GAIN_DASH = 15f;
-    private static final float ANXIETY_GAIN_ATTACK = 10f;
+    private static final float ANXIETY_GAIN_MOVE = 0.625f;
+    private static final float ANXIETY_LOSS_IDLE = 5f;
+    private static final float ANXIETY_GAIN_JUMP = 1.25f;
+    private static final float ANXIETY_GAIN_DASH = 2f;
+    private static final float ANXIETY_GAIN_ATTACK = 1.25f;
 
     private static final float PEAK_DURATION = 15f;
     private static final float OVERLOAD_DPS = 10f;
@@ -61,6 +63,7 @@ public class Player {
     private float velocityY;
     private boolean onGround;
     private boolean facingRight = true;
+    private int airJumpsLeft = 1;
 
     private float hp = MAX_HP;
     private float invulnerableTimer;
@@ -175,6 +178,7 @@ public class Player {
         velocityX = 0f;
         velocityY = 0f;
         onGround = false;
+        airJumpsLeft = MAX_AIR_JUMPS;
         dashing = false;
         attacking = false;
         dashCooldownTimer = 0f;
@@ -220,10 +224,16 @@ public class Player {
             }
         }
 
-        if (Gdx.input.isKeyJustPressed(Input.Keys.SPACE) && onGround && !dashing) {
-            velocityY = JUMP_FORCE;
-            onGround = false;
-            anxiety = Math.min(ANXIETY_MAX, anxiety + ANXIETY_GAIN_JUMP);
+        if (Gdx.input.isKeyJustPressed(Input.Keys.SPACE) && !dashing) {
+            if (onGround) {
+                velocityY = JUMP_FORCE;
+                onGround = false;
+                anxiety = Math.min(ANXIETY_MAX, anxiety + ANXIETY_GAIN_JUMP);
+            } else if (airJumpsLeft > 0) {
+                velocityY = AIR_JUMP_FORCE;
+                airJumpsLeft--;
+                anxiety = Math.min(ANXIETY_MAX, anxiety + ANXIETY_GAIN_JUMP);
+            }
         }
     }
 
@@ -372,6 +382,7 @@ public class Player {
             if (velocityY <= 0) {
                 y = pb.y + pb.height;
                 onGround = true;
+                airJumpsLeft = MAX_AIR_JUMPS;
             } else {
                 y = pb.y - SIZE;
             }
