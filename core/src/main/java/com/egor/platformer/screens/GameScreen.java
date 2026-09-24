@@ -30,11 +30,11 @@ public class GameScreen implements Screen {
 
     private final Game game;
 
-    private static final float VIEWPORT_WIDTH = 1280f;
-    private static final float VIEWPORT_HEIGHT = 720f;
+    private static final float VIEWPORT_WIDTH = 2560f;
+    private static final float VIEWPORT_HEIGHT = 1440f;
 
-    private static final float WORLD_WIDTH = 5120f;
-    private static final float WORLD_HEIGHT = 720f;
+    private static final float WORLD_WIDTH = 10240f;
+    private static final float WORLD_HEIGHT = 1440f;
 
     private static final int ENEMY_DAMAGE = 50;
     private static final int PLAYER_DAMAGE = 20;
@@ -42,18 +42,18 @@ public class GameScreen implements Screen {
 
     private static final float RUN_DUST_INTERVAL = 0.08f;
 
-    private static final float HP_BAR_X = 20f;
-    private static final float HP_BAR_Y = 660f;
-    private static final float HP_BAR_WIDTH = 60f;
-    private static final float HP_BAR_HEIGHT = 30f;
-    private static final float HP_BAR_GAP = 8f;
+    private static final float HP_BAR_X = 40f;
+    private static final float HP_BAR_Y = 1320f;
+    private static final float HP_BAR_WIDTH = 120f;
+    private static final float HP_BAR_HEIGHT = 60f;
+    private static final float HP_BAR_GAP = 16f;
     private static final int HP_BARS_COUNT = 5;
 
-    private static final float ANXIETY_BAR_Y = 615f;
-    private static final float ANXIETY_BAR_HEIGHT = 20f;
+    private static final float ANXIETY_BAR_Y = 1230f;
+    private static final float ANXIETY_BAR_HEIGHT = 40f;
 
-    private static final float ENEMY_HP_BAR_WIDTH = 50f;
-    private static final float ENEMY_HP_BAR_HEIGHT = 6f;
+    private static final float ENEMY_HP_BAR_WIDTH = 100f;
+    private static final float ENEMY_HP_BAR_HEIGHT = 12f;
 
     private float respawnX = 300f;
     private float respawnY = 300f;
