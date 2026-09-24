@@ -8,7 +8,7 @@ import com.badlogic.gdx.math.Rectangle;
  */
 public class Enemy {
 
-    public static final float SIZE = 160f;
+    public static final float SIZE = 120f;
     public static final int MAX_HP = 100;
 
     private float x;

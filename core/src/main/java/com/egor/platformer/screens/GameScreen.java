@@ -54,8 +54,8 @@ public class GameScreen implements Screen {
     private static final float ANXIETY_BAR_Y = 1230f;
     private static final float ANXIETY_BAR_HEIGHT = 40f;
 
-    private static final float ENEMY_HP_BAR_WIDTH = 200f;
-    private static final float ENEMY_HP_BAR_HEIGHT = 24f;
+    private static final float ENEMY_HP_BAR_WIDTH = 150f;
+    private static final float ENEMY_HP_BAR_HEIGHT = 18f;
 
     private float respawnX = 300f;
     private float respawnY = 300f;
@@ -74,6 +74,8 @@ public class GameScreen implements Screen {
     private OrthographicCamera hudCamera;
     private SpriteBatch batch;
     private ParallaxLayer forestLayer;
+
+    private float lookAheadCurrent = 0f;
 
     public GameScreen(Game game) {
         this.game = game;
@@ -119,7 +121,7 @@ public class GameScreen implements Screen {
         checkCheckpoints();
         emitMovementParticles(delta);
         updateParticles(delta);
-        updateCamera();
+        updateCamera(delta);
         draw();
     }
 
@@ -284,15 +286,26 @@ public class GameScreen implements Screen {
         }
     }
 
-    private void updateCamera() {
-        float targetX = player.getCenterX();
-        float targetY = player.getCenterY();
+    private void updateCamera(float delta) {
+        float playerCenterX = player.getCenterX();
+        float playerCenterY = player.getCenterY();
+
+        float smooth = 1f - (float) Math.pow(0.001f, delta);
+
+        float targetLookAhead = player.isFacingRight() ? 300f : -300f;
+        lookAheadCurrent += (targetLookAhead - lookAheadCurrent) * smooth;
+
+        float targetY = playerCenterY + VIEWPORT_HEIGHT * 0.28f;
+        float targetX = playerCenterX + lookAheadCurrent;
+
+        camera.position.x += (targetX - camera.position.x) * smooth;
+        camera.position.y += (targetY - camera.position.y) * smooth;
 
         float visibleHalfWidth = camera.viewportWidth / 2f * camera.zoom;
         float visibleHalfHeight = camera.viewportHeight / 2f * camera.zoom;
 
-        float clampedX = Math.max(visibleHalfWidth, Math.min(targetX, level.worldWidth - visibleHalfWidth));
-        float clampedY = Math.max(visibleHalfHeight, Math.min(targetY, level.worldHeight - visibleHalfHeight));
+        float clampedX = Math.max(visibleHalfWidth, Math.min(camera.position.x, level.worldWidth - visibleHalfWidth));
+        float clampedY = Math.max(visibleHalfHeight, Math.min(camera.position.y, level.worldHeight - visibleHalfHeight));
 
         camera.position.set(clampedX, clampedY, 0f);
         camera.update();

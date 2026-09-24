@@ -10,21 +10,20 @@ import java.util.List;
 
 /**
  * Player character. Owns its own state, input, physics and combat timers.
- * Sizes are scaled 4x so the sprite reads at a comfortable size on a
- * 2560x1440 viewport.
+ * Sizes are scaled to read at ~10% of a 1440p viewport, matching HK proportions.
  */
 public class Player {
 
-    public static final float SIZE = 200f;
+    public static final float SIZE = 150f;
     public static final int MAX_HP = 100;
 
-    private static final float MOVE_SPEED = 1200f;
-    private static final float GRAVITY = -6000f;
-    private static final float JUMP_FORCE = 2800f;
-    private static final float AIR_JUMP_FORCE = 2400f;
+    private static final float MOVE_SPEED = 900f;
+    private static final float GRAVITY = -4500f;
+    private static final float JUMP_FORCE = 2100f;
+    private static final float AIR_JUMP_FORCE = 1800f;
     private static final int MAX_AIR_JUMPS = 1;
 
-    private static final float DASH_SPEED = 3600f;
+    private static final float DASH_SPEED = 2700f;
     private static final float DASH_DURATION = 0.15f;
     private static final float DASH_COOLDOWN = 0.4f;
 
@@ -32,8 +31,8 @@ public class Player {
     private static final float ATTACK_STRIKE = 0.12f;
     private static final float ATTACK_TOTAL = ATTACK_WINDUP + ATTACK_STRIKE;
     private static final float ATTACK_COOLDOWN = 0.35f;
-    private static final float ATTACK_WIDTH = 220f;
-    private static final float ATTACK_HEIGHT = 200f;
+    private static final float ATTACK_WIDTH = 180f;
+    private static final float ATTACK_HEIGHT = 150f;
 
     private static final float INVULNERABLE_TIME = 1.2f;
     private static final float DEATH_Y = -400f;
@@ -53,9 +52,6 @@ public class Player {
     private static final float GLOW_COLOR_R = 1f;
     private static final float GLOW_COLOR_G = 0.80f;
     private static final float GLOW_COLOR_B = 0.35f;
-    private static final float GLOW_ALPHA_MAX = 0.55f;
-    private static final float GLOW_OUTER_RADIUS = 72f;
-    private static final float GLOW_INNER_RADIUS = 40f;
 
     private float x;
     private float y;
@@ -417,7 +413,7 @@ public class Player {
         float hairR = 0.05f, hairG = 0.05f, hairB = 0.06f;
 
         float coreR = GLOW_COLOR_R, coreG = GLOW_COLOR_G, coreB = GLOW_COLOR_B;
-        float glowAlpha = anxietyRatio * GLOW_ALPHA_MAX;
+        float glowAlpha = anxietyRatio * 0.35f;
 
         shapeRenderer.begin(ShapeRenderer.ShapeType.Filled);
 
@@ -464,13 +460,13 @@ public class Player {
         shapeRenderer.setColor(leatherR * 0.7f, leatherG * 0.7f, leatherB * 0.7f, alpha);
         shapeRenderer.rect(centerX - 56f, bottomY + 136f, 112f, 16f);
 
-        // Heart glow.
+        // Heart glow: a small ember in the chest, not a spotlight.
         if (glowAlpha > 0.01f) {
             float pulse = 1f + 0.15f * MathUtils.sin(anxiety * 0.4f);
-            shapeRenderer.setColor(coreR, coreG, coreB, glowAlpha * 0.35f);
-            shapeRenderer.circle(centerX, bottomY + 136f, 48f * pulse);
+            shapeRenderer.setColor(coreR, coreG, coreB, glowAlpha * 0.5f);
+            shapeRenderer.circle(centerX, bottomY + 136f, 12f * pulse);
             shapeRenderer.setColor(coreR, coreG, coreB, glowAlpha);
-            shapeRenderer.circle(centerX, bottomY + 136f, 20f * pulse);
+            shapeRenderer.circle(centerX, bottomY + 136f, 5f * pulse);
         }
 
         // Shoulders.
@@ -509,13 +505,10 @@ public class Player {
         shapeRenderer.rect(centerX - 40f, headY + 48f, 80f, 24f);
         shapeRenderer.rect(centerX - 40f, headY - 8f, 80f, 20f);
 
-        // Eyes.
+        // Two eyes, warm glints.
         shapeRenderer.setColor(0.9f, 0.75f, 0.35f, alpha);
-        if (facingRight) {
-            shapeRenderer.rect(centerX + 4f, headY + 24f, 12f, 12f);
-        } else {
-            shapeRenderer.rect(centerX - 16f, headY + 24f, 12f, 12f);
-        }
+        shapeRenderer.rect(centerX - 18f, headY + 24f, 10f, 10f);
+        shapeRenderer.rect(centerX + 8f, headY + 24f, 10f, 10f);
 
         if (attacking) {
             drawAttackSword(shapeRenderer, centerX, bottomY, alpha);
@@ -525,20 +518,23 @@ public class Player {
     }
 
     private void drawSheathedSword(ShapeRenderer shapeRenderer, float centerX, float bottomY, float alpha) {
-        shapeRenderer.setColor(0.18f, 0.12f, 0.08f, alpha);
-        float hx = centerX - 56f;
-        float hy = bottomY + 240f;
-        shapeRenderer.rect(hx, hy, 16f, 56f);
-        shapeRenderer.setColor(0.65f, 0.45f, 0.20f, alpha);
-        shapeRenderer.rect(hx - 4f, hy + 56f, 24f, 12f);
+        // Blade peeking over the right shoulder.
+        shapeRenderer.setColor(0.62f, 0.65f, 0.70f, alpha);
+        shapeRenderer.rect(centerX + 40f, bottomY + 250f, 20f, 120f);
+        shapeRenderer.setColor(0.82f, 0.85f, 0.88f, alpha);
+        shapeRenderer.rect(centerX + 52f, bottomY + 250f, 8f, 120f);
 
-        shapeRenderer.setColor(0.55f, 0.58f, 0.62f, alpha);
-        shapeRenderer.rect(centerX - 48f, bottomY + 200f, 112f, 16f);
-        shapeRenderer.setColor(0.75f, 0.78f, 0.82f, alpha);
-        shapeRenderer.rect(centerX - 48f, bottomY + 208f, 112f, 4f);
+        // Scabbard body.
+        shapeRenderer.setColor(0.20f, 0.14f, 0.10f, alpha);
+        shapeRenderer.rect(centerX - 60f, bottomY + 140f, 16f, 130f);
 
+        // Cross-guard.
         shapeRenderer.setColor(0.55f, 0.38f, 0.16f, alpha);
-        shapeRenderer.rect(centerX - 52f, bottomY + 196f, 20f, 20f);
+        shapeRenderer.rect(centerX + 32f, bottomY + 240f, 28f, 14f);
+
+        // Pommel.
+        shapeRenderer.setColor(0.75f, 0.55f, 0.25f, alpha);
+        shapeRenderer.rect(centerX - 66f, bottomY + 132f, 28f, 16f);
     }
 
     private void drawAttackSword(ShapeRenderer shapeRenderer,
