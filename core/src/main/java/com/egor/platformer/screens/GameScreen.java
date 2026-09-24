@@ -17,14 +17,16 @@ import com.egor.platformer.entities.Enemy;
 import com.egor.platformer.entities.Particle;
 import com.egor.platformer.entities.Platform;
 import com.egor.platformer.entities.Player;
+import com.egor.platformer.world.Level;
+import com.egor.platformer.world.LevelBuilder;
 
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 
 /**
- * Main gameplay screen. Owns the level, enemies, particles, camera and HUD,
- * and drives the player each frame.
+ * Main gameplay screen. Drives the player, enemies and particles each frame,
+ * and renders the level plus the HUD.
  */
 public class GameScreen implements Screen {
 
@@ -32,9 +34,6 @@ public class GameScreen implements Screen {
 
     private static final float VIEWPORT_WIDTH = 2560f;
     private static final float VIEWPORT_HEIGHT = 1440f;
-
-    private static final float WORLD_WIDTH = 10240f;
-    private static final float WORLD_HEIGHT = 1440f;
 
     private static final int ENEMY_DAMAGE = 50;
     private static final int PLAYER_DAMAGE = 20;
@@ -61,10 +60,8 @@ public class GameScreen implements Screen {
     private float runDustTimer = 0f;
     private boolean wasOnGroundLastFrame = false;
 
-    private final List<Platform> platforms = new ArrayList<>();
+    private Level level;
     private final List<Particle> particles = new ArrayList<>();
-    private final List<Enemy> enemies = new ArrayList<>();
-    private final List<Checkpoint> checkpoints = new ArrayList<>();
 
     private Player player;
 
@@ -86,37 +83,17 @@ public class GameScreen implements Screen {
         hudCamera = new OrthographicCamera();
         hudCamera.setToOrtho(false, VIEWPORT_WIDTH, VIEWPORT_HEIGHT);
         hudCamera.update();
-        player = new Player(300f, 300f);
-        buildLevel();
-    }
 
-    private void buildLevel() {
-        platforms.add(new Platform(0, 50, WORLD_WIDTH, 50));
-        platforms.add(new Platform(400, 200, 150, 20));
-        platforms.add(new Platform(800, 300, 180, 20));
-        platforms.add(new Platform(1200, 400, 150, 20));
-        platforms.add(new Platform(1600, 250, 200, 20));
-        platforms.add(new Platform(2100, 350, 160, 20));
-        platforms.add(new Platform(2600, 200, 150, 20));
-        platforms.add(new Platform(3000, 400, 180, 20));
-        platforms.add(new Platform(3500, 300, 200, 20));
-        platforms.add(new Platform(4000, 250, 150, 20));
-        platforms.add(new Platform(4500, 350, 180, 20));
-
-        enemies.add(new Enemy(700, 350, 800, 980, 1f));
-        enemies.add(new Enemy(1650, 300, 1600, 1800, -1f));
-        enemies.add(new Enemy(3050, 450, 3000, 3180, 1f));
-        enemies.add(new Enemy(4050, 300, 4000, 4150, -1f));
-
-        checkpoints.add(new Checkpoint(1000, 100, 40, 100, 1000, 150));
-        checkpoints.add(new Checkpoint(2400, 100, 40, 100, 2400, 150));
-        checkpoints.add(new Checkpoint(3800, 100, 40, 100, 3800, 150));
+        level = LevelBuilder.buildLevel1();
+        player = new Player(level.spawnX, level.spawnY);
+        respawnX = level.spawnX;
+        respawnY = level.spawnY;
     }
 
     @Override
     public void render(float delta) {
         handleScreenInput();
-        player.update(delta, platforms);
+        player.update(delta, level.platforms);
 
         if (player.isDashJustStarted()) {
             emitDashTrail();
@@ -148,10 +125,10 @@ public class GameScreen implements Screen {
     }
 
     private void updateEnemies(float delta) {
-        for (Enemy enemy : enemies) {
+        for (Enemy enemy : level.enemies) {
             enemy.update(delta, ENEMY_SPEED);
         }
-        enemies.removeIf(Enemy::isDead);
+        level.enemies.removeIf(Enemy::isDead);
     }
 
     private void checkCombat() {
@@ -160,7 +137,7 @@ public class GameScreen implements Screen {
         if (player.isStrikeActive() && !player.isAttackHitApplied()) {
             Rectangle attack = player.attackBounds();
 
-            for (Enemy enemy : enemies) {
+            for (Enemy enemy : level.enemies) {
                 if (attack.overlaps(enemy.bounds())) {
                     int damage = (int) (ENEMY_DAMAGE * player.getDamageMultiplier());
                     enemy.takeDamage(damage);
@@ -173,7 +150,7 @@ public class GameScreen implements Screen {
 
         if (player.getInvulnerableTimer() > 0f) return;
 
-        for (Enemy enemy : enemies) {
+        for (Enemy enemy : level.enemies) {
             if (playerBounds.overlaps(enemy.bounds())) {
                 player.takeDamage(PLAYER_DAMAGE);
                 return;
@@ -184,7 +161,7 @@ public class GameScreen implements Screen {
     private void checkCheckpoints() {
         Rectangle playerBounds = player.bounds();
 
-        for (Checkpoint checkpoint : checkpoints) {
+        for (Checkpoint checkpoint : level.checkpoints) {
             if (checkpoint.isActivated()) continue;
 
             if (playerBounds.overlaps(checkpoint.getBounds())) {
@@ -304,8 +281,8 @@ public class GameScreen implements Screen {
         float visibleHalfWidth = camera.viewportWidth / 2f * camera.zoom;
         float visibleHalfHeight = camera.viewportHeight / 2f * camera.zoom;
 
-        float clampedX = Math.max(visibleHalfWidth, Math.min(targetX, WORLD_WIDTH - visibleHalfWidth));
-        float clampedY = Math.max(visibleHalfHeight, Math.min(targetY, WORLD_HEIGHT - visibleHalfHeight));
+        float clampedX = Math.max(visibleHalfWidth, Math.min(targetX, level.worldWidth - visibleHalfWidth));
+        float clampedY = Math.max(visibleHalfHeight, Math.min(targetY, level.worldHeight - visibleHalfHeight));
 
         camera.position.set(clampedX, clampedY, 0f);
         camera.update();
@@ -333,7 +310,7 @@ public class GameScreen implements Screen {
     private void drawPlatforms() {
         shapeRenderer.begin(ShapeType.Filled);
         shapeRenderer.setColor(0.3f, 0.25f, 0.2f, 1f);
-        for (Platform platform : platforms) {
+        for (Platform platform : level.platforms) {
             Rectangle bounds = platform.getBounds();
             shapeRenderer.rect(bounds.x, bounds.y, bounds.width, bounds.height);
         }
@@ -342,7 +319,7 @@ public class GameScreen implements Screen {
 
     private void drawCheckpoints() {
         shapeRenderer.begin(ShapeType.Filled);
-        for (Checkpoint checkpoint : checkpoints) {
+        for (Checkpoint checkpoint : level.checkpoints) {
             Rectangle bounds = checkpoint.getBounds();
             if (checkpoint.isActivated()) {
                 shapeRenderer.setColor(0.3f, 0.9f, 0.4f, 0.7f);
@@ -356,7 +333,7 @@ public class GameScreen implements Screen {
 
     private void drawEnemies() {
         shapeRenderer.begin(ShapeType.Filled);
-        for (Enemy enemy : enemies) {
+        for (Enemy enemy : level.enemies) {
             shapeRenderer.setColor(0.85f, 0.25f, 0.25f, 1f);
             shapeRenderer.rect(enemy.getX(), enemy.getY(), Enemy.SIZE, Enemy.SIZE);
 
@@ -382,7 +359,7 @@ public class GameScreen implements Screen {
 
     private void drawEnemyHpBars() {
         shapeRenderer.begin(ShapeType.Filled);
-        for (Enemy enemy : enemies) {
+        for (Enemy enemy : level.enemies) {
             float barX = enemy.getX() + Enemy.SIZE / 2f - ENEMY_HP_BAR_WIDTH / 2f;
             float barY = enemy.getY() + Enemy.SIZE + 8f;
 
@@ -433,7 +410,6 @@ public class GameScreen implements Screen {
         float a = player.getAnxiety();
         boolean inPeak = player.isPeakActive();
 
-        // While the peak window is open the bar pulses bright white.
         if (inPeak) {
             float pulse = 0.7f + 0.3f * MathUtils.sin(player.getPeakTimer() * 20f);
             shapeRenderer.setColor(1f, 1f, 1f, pulse);
