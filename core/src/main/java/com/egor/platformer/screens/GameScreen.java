@@ -322,13 +322,12 @@ public class GameScreen implements Screen {
         drawCheckpoints();
         drawEnemies();
         drawParticles();
-        drawPlayer();
+        player.draw(shapeRenderer);
         drawEnemyHpBars();
 
         shapeRenderer.setProjectionMatrix(hudCamera.combined);
         drawPlayerHud();
     }
-
     private void drawPlatforms() {
         shapeRenderer.begin(ShapeType.Filled);
         shapeRenderer.setColor(0.3f, 0.25f, 0.2f, 1f);
@@ -377,70 +376,6 @@ public class GameScreen implements Screen {
             shapeRenderer.rect(p.x - p.size / 2f, p.y - p.size / 2f, p.size, p.size);
         }
         shapeRenderer.end();
-    }
-
-    private void drawPlayer() {
-        float centerX = player.getCenterX();
-        float bottomY = player.getY();
-
-        float alpha = 1f;
-        if (player.isDashing()) alpha = 0.6f;
-        if (player.getInvulnerableTimer() > 0f) {
-            alpha = 0.4f + 0.6f * Math.abs(MathUtils.sin(player.getInvulnerableTimer() * 20f));
-        }
-
-        float cloakR = 0.15f, cloakG = 0.15f, cloakB = 0.20f;
-        float maskR = 0.85f, maskG = 0.85f, maskB = 0.80f;
-        float hornR = 0.65f, hornG = 0.65f, hornB = 0.60f;
-        float nailR = 0.75f, nailG = 0.75f, nailB = 0.70f;
-
-        shapeRenderer.begin(ShapeType.Filled);
-        shapeRenderer.setColor(cloakR, cloakG, cloakB, alpha);
-        shapeRenderer.rect(centerX - 15f, bottomY, 30f, 40f);
-
-        drawSword(centerX, bottomY, alpha, nailR, nailG, nailB);
-
-        shapeRenderer.setColor(maskR, maskG, maskB, alpha);
-        shapeRenderer.circle(centerX, bottomY + 48f, 14f);
-
-        shapeRenderer.setColor(hornR, hornG, hornB, alpha);
-        shapeRenderer.triangle(
-            centerX - 12f, bottomY + 55f,
-            centerX - 4f, bottomY + 55f,
-            centerX - 10f, bottomY + 72f
-        );
-        shapeRenderer.triangle(
-            centerX + 4f, bottomY + 55f,
-            centerX + 12f, bottomY + 55f,
-            centerX + 10f, bottomY + 72f
-        );
-        shapeRenderer.end();
-    }
-
-    private void drawSword(float centerX, float bottomY, float alpha, float r, float g, float b) {
-        shapeRenderer.setColor(r, g, b, alpha);
-
-        boolean facingRight = player.isFacingRight();
-        float handX = facingRight ? centerX + 12f : centerX - 12f;
-        float handY = bottomY + 22f;
-
-        if (!player.isAttacking()) {
-            float x = facingRight ? handX : handX - 8f;
-            shapeRenderer.rect(x, handY - 4f, 8f, 25f);
-            return;
-        }
-
-        boolean windup = player.getAttackTimer() > 0.12f;
-
-        if (windup) {
-            float x = handX - 4f;
-            shapeRenderer.rect(x, bottomY + 40f, 8f, 40f);
-        } else {
-            float reach = 40f;
-            float x = facingRight ? handX : handX - reach;
-            float y = bottomY + 5f;
-            shapeRenderer.rect(x, y, reach, 10f);
-        }
     }
 
     private void drawEnemyHpBars() {

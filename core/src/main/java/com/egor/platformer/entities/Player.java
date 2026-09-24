@@ -349,4 +349,79 @@ public class Player {
             pendingRespawn = true;
         }
     }
+
+    /**
+     * Draws the player using the given shape renderer.
+     * The caller is responsible for begin()/end() around the call is NOT
+     * needed: this method manages its own ShapeRenderer.begin/end block.
+     */
+    public void draw(com.badlogic.gdx.graphics.glutils.ShapeRenderer shapeRenderer) {
+        float centerX = getCenterX();
+        float bottomY = y;
+
+        // While invulnerable, blink so the player can read the damage state.
+        float alpha = 1f;
+        if (dashing) alpha = 0.6f;
+        if (invulnerableTimer > 0f) {
+            alpha = 0.4f + 0.6f * Math.abs(com.badlogic.gdx.math.MathUtils.sin(invulnerableTimer * 20f));
+        }
+
+        float cloakR = 0.15f, cloakG = 0.15f, cloakB = 0.20f;
+        float maskR = 0.85f, maskG = 0.85f, maskB = 0.80f;
+        float hornR = 0.65f, hornG = 0.65f, hornB = 0.60f;
+        float nailR = 0.75f, nailG = 0.75f, nailB = 0.70f;
+
+        shapeRenderer.begin(com.badlogic.gdx.graphics.glutils.ShapeRenderer.ShapeType.Filled);
+        shapeRenderer.setColor(cloakR, cloakG, cloakB, alpha);
+        shapeRenderer.rect(centerX - 15f, bottomY, 30f, 40f);
+
+        drawSword(shapeRenderer, centerX, bottomY, alpha, nailR, nailG, nailB);
+
+        shapeRenderer.setColor(maskR, maskG, maskB, alpha);
+        shapeRenderer.circle(centerX, bottomY + 48f, 14f);
+
+        shapeRenderer.setColor(hornR, hornG, hornB, alpha);
+        shapeRenderer.triangle(
+            centerX - 12f, bottomY + 55f,
+            centerX - 4f, bottomY + 55f,
+            centerX - 10f, bottomY + 72f
+        );
+        shapeRenderer.triangle(
+            centerX + 4f, bottomY + 55f,
+            centerX + 12f, bottomY + 55f,
+            centerX + 10f, bottomY + 72f
+        );
+        shapeRenderer.end();
+    }
+
+    /**
+     * Draws the nail in one of three states: idle (at the side), windup
+     * (raised above the head) or strike (slammed forward and down).
+     */
+    private void drawSword(com.badlogic.gdx.graphics.glutils.ShapeRenderer shapeRenderer,
+                           float centerX, float bottomY, float alpha,
+                           float r, float g, float b) {
+        shapeRenderer.setColor(r, g, b, alpha);
+
+        float handX = facingRight ? centerX + 12f : centerX - 12f;
+        float handY = bottomY + 22f;
+
+        if (!attacking) {
+            float x = facingRight ? handX : handX - 8f;
+            shapeRenderer.rect(x, handY - 4f, 8f, 25f);
+            return;
+        }
+
+        boolean windup = attackTimer > ATTACK_STRIKE;
+
+        if (windup) {
+            float x = handX - 4f;
+            shapeRenderer.rect(x, bottomY + 40f, 8f, 40f);
+        } else {
+            float reach = 40f;
+            float x = facingRight ? handX : handX - reach;
+            float y = bottomY + 5f;
+            shapeRenderer.rect(x, y, reach, 10f);
+        }
+    }
 }
