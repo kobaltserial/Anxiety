@@ -431,7 +431,13 @@ public class GameScreen implements Screen {
         shapeRenderer.rect(HP_BAR_X - 2f, ANXIETY_BAR_Y - 2f, totalWidth + 4f, ANXIETY_BAR_HEIGHT + 4f);
 
         float a = player.getAnxiety();
-        if (a < 15f) {
+        boolean inPeak = player.isPeakActive();
+
+        // While the peak window is open the bar pulses bright white.
+        if (inPeak) {
+            float pulse = 0.7f + 0.3f * MathUtils.sin(player.getPeakTimer() * 20f);
+            shapeRenderer.setColor(1f, 1f, 1f, pulse);
+        } else if (a < 15f) {
             shapeRenderer.setColor(0.9f, 0.2f, 0.2f, 1f);
         } else if (a > 90f) {
             shapeRenderer.setColor(1f, 0.6f, 0.2f, 1f);

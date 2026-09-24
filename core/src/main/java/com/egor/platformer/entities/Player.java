@@ -44,6 +44,10 @@ public class Player {
     private static final float ANXIETY_GAIN_DASH = 15f;
     private static final float ANXIETY_GAIN_ATTACK = 10f;
 
+    private static final float PEAK_DURATION = 15f;
+    private static final float OVERLOAD_DPS = 10f;
+    private static final float IDLE_THRESHOLD = 3f;
+
     private static final float GLOW_COLOR_R = 1f;
     private static final float GLOW_COLOR_G = 0.95f;
     private static final float GLOW_COLOR_B = 0.4f;
@@ -63,6 +67,9 @@ public class Player {
 
     private float anxiety = ANXIETY_START;
     private boolean anxietyDeath;
+    private float peakTimer;
+    private boolean overloadActive;
+    private float idleTimer;
 
     private boolean dashing;
     private float dashTimer;
@@ -108,8 +115,11 @@ public class Player {
     public float getInvulnerableTimer() { return invulnerableTimer; }
     public float getAnxiety() { return anxiety; }
     public boolean isAnxietyDeath() { return anxietyDeath; }
+    public float getPeakTimer() { return peakTimer; }
+    public boolean isPeakActive() { return peakTimer > 0f && anxiety >= ANXIETY_MAX; }
 
     public float getDamageMultiplier() {
+        if (isPeakActive()) return 3.0f;
         if (anxiety < 30f) return 1.0f;
         if (anxiety < 50f) return 1.2f;
         if (anxiety < 70f) return 1.5f;
@@ -118,6 +128,7 @@ public class Player {
     }
 
     public float getAttackSpeedMultiplier() {
+        if (isPeakActive()) return 2.5f;
         if (anxiety < 30f) return 1.0f;
         if (anxiety < 50f) return 1.1f;
         if (anxiety < 70f) return 1.25f;
@@ -172,6 +183,9 @@ public class Player {
         hp = MAX_HP;
         anxiety = ANXIETY_START;
         anxietyDeath = false;
+        peakTimer = 0f;
+        overloadActive = false;
+        idleTimer = 0f;
         pendingRespawn = false;
     }
 
@@ -253,18 +267,54 @@ public class Player {
     private void updateAnxiety(float delta) {
         if (anxietyDeath) return;
 
-        boolean moving = Math.abs(velocityX) > 1f || !onGround || dashing;
+        boolean moving = Math.abs(velocityX) > 1f || dashing;
 
         if (moving) {
             anxiety += ANXIETY_GAIN_MOVE * delta;
+            idleTimer = 0f;
         } else {
-            anxiety -= ANXIETY_LOSS_IDLE * delta;
+            idleTimer += delta;
+            boolean atPeak = anxiety >= ANXIETY_MAX;
+
+            if (!atPeak || idleTimer >= IDLE_THRESHOLD) {
+                anxiety -= ANXIETY_LOSS_IDLE * delta;
+            }
         }
 
         anxiety = MathUtils.clamp(anxiety, 0f, ANXIETY_MAX);
 
         if (anxiety <= 0f) {
             anxietyDeath = true;
+        }
+
+        updatePeak(delta);
+    }
+
+    private void updatePeak(float delta) {
+        // The peak only starts when anxiety first reaches max, and only once per climb.
+        if (anxiety >= ANXIETY_MAX && peakTimer <= 0f && !overloadActive) {
+            peakTimer = PEAK_DURATION;
+            overloadActive = true;
+        }
+
+        if (peakTimer > 0f) {
+            peakTimer -= delta;
+            if (peakTimer < 0f) {
+                peakTimer = 0f;
+            }
+            return;
+        }
+
+        // Peak window is over but anxiety is still maxed: overload drains hp.
+        if (overloadActive && anxiety >= ANXIETY_MAX) {
+            hp -= OVERLOAD_DPS * delta;
+            if (hp <= 0f) {
+                hp = 0;
+                pendingRespawn = true;
+            }
+        } else if (anxiety < ANXIETY_MAX) {
+            // Player dropped out of the peak, so it can trigger again next time.
+            overloadActive = false;
         }
     }
 
