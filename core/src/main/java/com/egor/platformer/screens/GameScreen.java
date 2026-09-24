@@ -8,6 +8,8 @@ import com.badlogic.gdx.graphics.GL20;
 import com.badlogic.gdx.graphics.OrthographicCamera;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer.ShapeType;
+import com.badlogic.gdx.graphics.Texture;
+import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.math.MathUtils;
 import com.badlogic.gdx.math.Rectangle;
 import com.badlogic.gdx.utils.viewport.FitViewport;
@@ -19,6 +21,7 @@ import com.egor.platformer.entities.Platform;
 import com.egor.platformer.entities.Player;
 import com.egor.platformer.world.Level;
 import com.egor.platformer.world.LevelBuilder;
+import com.egor.platformer.world.ParallaxLayer;
 
 import java.util.ArrayList;
 import java.util.Iterator;
@@ -69,6 +72,8 @@ public class GameScreen implements Screen {
     private OrthographicCamera camera;
     private Viewport viewport;
     private OrthographicCamera hudCamera;
+    private SpriteBatch batch;
+    private ParallaxLayer forestLayer;
 
     public GameScreen(Game game) {
         this.game = game;
@@ -77,12 +82,17 @@ public class GameScreen implements Screen {
     @Override
     public void show() {
         shapeRenderer = new ShapeRenderer();
+        batch = new SpriteBatch();
         camera = new OrthographicCamera();
         viewport = new FitViewport(VIEWPORT_WIDTH, VIEWPORT_HEIGHT, camera);
         viewport.update(Gdx.graphics.getWidth(), Gdx.graphics.getHeight(), true);
         hudCamera = new OrthographicCamera();
         hudCamera.setToOrtho(false, VIEWPORT_WIDTH, VIEWPORT_HEIGHT);
         hudCamera.update();
+
+        Texture forestTexture = new Texture(Gdx.files.internal("backgrounds/forest.png"));
+        forestLayer = new ParallaxLayer(forestTexture, 0.3f,
+            VIEWPORT_WIDTH, VIEWPORT_HEIGHT, 0f);
 
         level = LevelBuilder.buildLevel1();
         player = new Player(level.spawnX, level.spawnY);
@@ -289,10 +299,15 @@ public class GameScreen implements Screen {
     }
 
     private void draw() {
-        Gdx.gl.glClearColor(0.1f, 0.1f, 0.15f, 1f);
+        Gdx.gl.glClearColor(0.02f, 0.02f, 0.04f, 1f);
         Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT);
 
         viewport.apply();
+
+        batch.setProjectionMatrix(camera.combined);
+        batch.begin();
+        forestLayer.draw(batch, camera);
+        batch.end();
 
         shapeRenderer.setProjectionMatrix(camera.combined);
         drawPlatforms();
@@ -459,16 +474,16 @@ public class GameScreen implements Screen {
     }
 
     private static final boolean[][] SEVEN_SEGMENT = {
-        { true,  true,  true,  false, true,  true,  true  },
-        { false, false, true,  false, false, true,  false },
-        { true,  false, true,  true,  true,  false, true  },
-        { true,  false, true,  true,  false, true,  true  },
-        { false, true,  true,  true,  false, true,  false },
-        { true,  true,  false, true,  false, true,  true  },
-        { true,  true,  false, true,  true,  true,  true  },
-        { true,  false, true,  false, false, true,  false },
-        { true,  true,  true,  true,  true,  true,  true  },
-        { true,  true,  true,  true,  false, true,  true  },
+        {true, true, true, false, true, true, true},
+        {false, false, true, false, false, true, false},
+        {true, false, true, true, true, false, true},
+        {true, false, true, true, false, true, true},
+        {false, true, true, true, false, true, false},
+        {true, true, false, true, false, true, true},
+        {true, true, false, true, true, true, true},
+        {true, false, true, false, false, true, false},
+        {true, true, true, true, true, true, true},
+        {true, true, true, true, false, true, true},
     };
 
     @Override
@@ -477,12 +492,22 @@ public class GameScreen implements Screen {
         viewport.update(width, height, false);
     }
 
-    @Override public void pause() {}
-    @Override public void resume() {}
-    @Override public void hide() {}
+    @Override
+    public void pause() {
+    }
+
+    @Override
+    public void resume() {
+    }
+
+    @Override
+    public void hide() {
+    }
 
     @Override
     public void dispose() {
         shapeRenderer.dispose();
+        batch.dispose();
+        forestLayer.dispose();
     }
 }
