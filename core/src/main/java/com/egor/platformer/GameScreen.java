@@ -41,6 +41,8 @@ public class GameScreen implements Screen {
     private static final float ATTACK_WIDTH = 55f;
     private static final float ATTACK_HEIGHT = 40f;
 
+    private static final float ENEMY_SPEED = 80f;
+
     private static final float DEATH_Y = -100f;
     private static final float RUN_DUST_INTERVAL = 0.08f;
 
@@ -66,6 +68,7 @@ public class GameScreen implements Screen {
 
     private final List<Platform> platforms = new ArrayList<>();
     private final List<Particle> particles = new ArrayList<>();
+    private final List<Enemy> enemies = new ArrayList<>();
 
     private ShapeRenderer shapeRenderer;
     private OrthographicCamera camera;
@@ -91,12 +94,20 @@ public class GameScreen implements Screen {
         platforms.add(new Platform(3500, 300, 200, 20));
         platforms.add(new Platform(4000, 250, 150, 20));
         platforms.add(new Platform(4500, 350, 180, 20));
+
+        // One enemy per platform, patrolling the full width of each.
+        enemies.add(new Enemy(700, 350, 800, 980, 1f));
+        enemies.add(new Enemy(1650, 300, 1600, 1800, -1f));
+        enemies.add(new Enemy(3050, 450, 3000, 3180, 1f));
+        enemies.add(new Enemy(4050, 300, 4000, 4150, -1f));
     }
 
     @Override
     public void render(float delta) {
         handleInput(delta);
         applyPhysics(delta);
+        updateEnemies(delta);
+        checkCombat();
         updateParticles(delta);
         updateCamera();
         draw();
@@ -237,6 +248,37 @@ public class GameScreen implements Screen {
         }
     }
 
+    private void updateEnemies(float delta) {
+        for (Enemy enemy : enemies) {
+            if (enemy.isAlive()) {
+                enemy.update(delta, ENEMY_SPEED);
+            }
+        }
+        enemies.removeIf(enemy -> !enemy.isAlive());
+    }
+
+    private void checkCombat() {
+        Rectangle player = playerBounds();
+        Rectangle attack = isAttacking ? attackBounds() : null;
+
+        for (Enemy enemy : enemies) {
+            if (!enemy.isAlive()) continue;
+
+            Rectangle enemyBounds = enemy.bounds();
+
+            if (attack != null && attack.overlaps(enemyBounds)) {
+                enemy.kill();
+                emitEnemyDeath(enemy);
+                continue;
+            }
+
+            if (player.overlaps(enemyBounds)) {
+                respawn();
+                return;
+            }
+        }
+    }
+
     private Rectangle playerBounds() {
         return new Rectangle(playerX, playerY, PLAYER_SIZE, PLAYER_SIZE);
     }
@@ -339,6 +381,26 @@ public class GameScreen implements Screen {
         }
     }
 
+    private void emitEnemyDeath(Enemy enemy) {
+        float cx = enemy.getX() + Enemy.SIZE / 2f;
+        float cy = enemy.getY() + Enemy.SIZE / 2f;
+
+        // A wider burst than the attack spark, with the enemy's own color.
+        for (int i = 0; i < 18; i++) {
+            float angle = MathUtils.random(0f, MathUtils.PI2);
+            float speed = MathUtils.random(80f, 220f);
+
+            particles.add(new Particle(
+                cx, cy,
+                MathUtils.cos(angle) * speed,
+                MathUtils.sin(angle) * speed,
+                MathUtils.random(3f, 6f),
+                MathUtils.random(0.25f, 0.5f),
+                0.9f, 0.35f, 0.35f
+            ));
+        }
+    }
+
     private void updateParticles(float delta) {
         Iterator<Particle> it = particles.iterator();
         while (it.hasNext()) {
@@ -392,8 +454,28 @@ public class GameScreen implements Screen {
         }
         shapeRenderer.end();
 
+        drawEnemies();
         drawParticles();
         drawPlayer();
+    }
+
+    private void drawEnemies() {
+        shapeRenderer.begin(ShapeType.Filled);
+        for (Enemy enemy : enemies) {
+            if (!enemy.isAlive()) continue;
+
+            shapeRenderer.setColor(0.85f, 0.25f, 0.25f, 1f);
+            shapeRenderer.rect(enemy.getX(), enemy.getY(), Enemy.SIZE, Enemy.SIZE);
+
+            // Two small eyes to show facing direction.
+            float eyeY = enemy.getY() + Enemy.SIZE - 12f;
+            float eyeOffsetX = 8f;
+            float eyeCenterX = enemy.getX() + Enemy.SIZE / 2f;
+            shapeRenderer.setColor(1f, 1f, 1f, 1f);
+            shapeRenderer.circle(eyeCenterX - eyeOffsetX, eyeY, 3f);
+            shapeRenderer.circle(eyeCenterX + eyeOffsetX, eyeY, 3f);
+        }
+        shapeRenderer.end();
     }
 
     private void drawParticles() {
@@ -421,7 +503,6 @@ public class GameScreen implements Screen {
         shapeRenderer.setColor(cloakR, cloakG, cloakB, alpha);
         shapeRenderer.rect(centerX - 15f, bottomY, 30f, 40f);
 
-        // Nail position shifts while attacking: it thrusts forward in the attack direction.
         float nailOffset = isAttacking ? 30f : 12f;
         float nailX = facingRight ? centerX + nailOffset : centerX - nailOffset - 8f;
         float nailWidth = isAttacking ? 35f : 8f;
