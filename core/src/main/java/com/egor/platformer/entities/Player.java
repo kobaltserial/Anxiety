@@ -84,4 +84,8 @@ public class Player {
     public float getInvulnerableTimer() {
         return invulnerableTimer;
     }
+    public void updatePosition(float x, float y) {
+        this.x = x;
+        this.y = y;
+    }
 }

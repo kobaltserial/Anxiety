@@ -16,6 +16,7 @@ import com.egor.platformer.entities.Checkpoint;
 import com.egor.platformer.entities.Enemy;
 import com.egor.platformer.entities.Particle;
 import com.egor.platformer.entities.Platform;
+import com.egor.platformer.entities.Player;
 
 import java.util.ArrayList;
 import java.util.Iterator;
@@ -105,6 +106,8 @@ public class GameScreen implements Screen {
     private final List<Enemy> enemies = new ArrayList<>();
     private final List<Checkpoint> checkpoints = new ArrayList<>();
 
+    private Player player;
+
     private ShapeRenderer shapeRenderer;
     private OrthographicCamera camera;
     private Viewport viewport;
@@ -119,12 +122,11 @@ public class GameScreen implements Screen {
         shapeRenderer = new ShapeRenderer();
         camera = new OrthographicCamera();
         viewport = new FitViewport(VIEWPORT_WIDTH, VIEWPORT_HEIGHT, camera);
-        // resize() is not always called before the first render, so set the
-        // viewport size manually to match the current window.
         viewport.update(Gdx.graphics.getWidth(), Gdx.graphics.getHeight(), true);
         hudCamera = new OrthographicCamera();
         hudCamera.setToOrtho(false, VIEWPORT_WIDTH, VIEWPORT_HEIGHT);
         hudCamera.update();
+        player = new Player(playerX, playerY);
         buildLevel();
     }
 
@@ -259,6 +261,7 @@ public class GameScreen implements Screen {
         if (playerY < DEATH_Y) {
             killPlayer();
         }
+        player.updatePosition(playerX, playerY);
     }
 
     private void resolveX() {
