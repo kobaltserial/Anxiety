@@ -117,6 +117,14 @@ public class Player {
         return 2.5f;
     }
 
+    public float getAttackSpeedMultiplier() {
+        if (anxiety < 30f) return 1.0f;
+        if (anxiety < 50f) return 1.1f;
+        if (anxiety < 70f) return 1.25f;
+        if (anxiety < 90f) return 1.5f;
+        return 2.0f;
+    }
+
     public boolean isOnGround() { return onGround; }
     public boolean isAttackHitApplied() { return attackHitApplied; }
     public boolean isStrikeActive() { return attacking && attackTimer <= ATTACK_STRIKE; }
@@ -223,7 +231,7 @@ public class Player {
 
         attacking = true;
         attackTimer = ATTACK_TOTAL;
-        attackCooldownTimer = ATTACK_COOLDOWN;
+        attackCooldownTimer = ATTACK_COOLDOWN / getAttackSpeedMultiplier();
         attackDirection = facingRight ? 1f : -1f;
         attackHitApplied = false;
         anxiety = Math.min(ANXIETY_MAX, anxiety + ANXIETY_GAIN_ATTACK);
