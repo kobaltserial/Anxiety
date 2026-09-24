@@ -10,21 +10,21 @@ import java.util.List;
 
 /**
  * Player character. Owns its own state, input, physics and combat timers.
- * The game loop calls {@link #update(float, List)} every frame and reads
- * the resulting position and flags through getters.
+ * Sizes are scaled 4x so the sprite reads at a comfortable size on a
+ * 2560x1440 viewport.
  */
 public class Player {
 
-    public static final float SIZE = 50f;
+    public static final float SIZE = 200f;
     public static final int MAX_HP = 100;
 
-    private static final float MOVE_SPEED = 300f;
-    private static final float GRAVITY = -1500f;
-    private static final float JUMP_FORCE = 700f;
-    private static final float AIR_JUMP_FORCE = 600f;
+    private static final float MOVE_SPEED = 1200f;
+    private static final float GRAVITY = -6000f;
+    private static final float JUMP_FORCE = 2800f;
+    private static final float AIR_JUMP_FORCE = 2400f;
     private static final int MAX_AIR_JUMPS = 1;
 
-    private static final float DASH_SPEED = 900f;
+    private static final float DASH_SPEED = 3600f;
     private static final float DASH_DURATION = 0.15f;
     private static final float DASH_COOLDOWN = 0.4f;
 
@@ -32,11 +32,11 @@ public class Player {
     private static final float ATTACK_STRIKE = 0.12f;
     private static final float ATTACK_TOTAL = ATTACK_WINDUP + ATTACK_STRIKE;
     private static final float ATTACK_COOLDOWN = 0.35f;
-    private static final float ATTACK_WIDTH = 55f;
-    private static final float ATTACK_HEIGHT = 50f;
+    private static final float ATTACK_WIDTH = 220f;
+    private static final float ATTACK_HEIGHT = 200f;
 
     private static final float INVULNERABLE_TIME = 1.2f;
-    private static final float DEATH_Y = -100f;
+    private static final float DEATH_Y = -400f;
 
     private static final float ANXIETY_MAX = 100f;
     private static final float ANXIETY_START = 50f;
@@ -51,11 +51,11 @@ public class Player {
     private static final float IDLE_THRESHOLD = 3f;
 
     private static final float GLOW_COLOR_R = 1f;
-    private static final float GLOW_COLOR_G = 0.95f;
-    private static final float GLOW_COLOR_B = 0.4f;
-    private static final float GLOW_ALPHA_MAX = 0.45f;
-    private static final float GLOW_OUTER_RADIUS = 18f;
-    private static final float GLOW_INNER_RADIUS = 10f;
+    private static final float GLOW_COLOR_G = 0.80f;
+    private static final float GLOW_COLOR_B = 0.35f;
+    private static final float GLOW_ALPHA_MAX = 0.55f;
+    private static final float GLOW_OUTER_RADIUS = 72f;
+    private static final float GLOW_INNER_RADIUS = 40f;
 
     private float x;
     private float y;
@@ -301,7 +301,6 @@ public class Player {
     }
 
     private void updatePeak(float delta) {
-        // The peak only starts when anxiety first reaches max, and only once per climb.
         if (anxiety >= ANXIETY_MAX && peakTimer <= 0f && !overloadActive) {
             peakTimer = PEAK_DURATION;
             overloadActive = true;
@@ -315,7 +314,6 @@ public class Player {
             return;
         }
 
-        // Peak window is over but anxiety is still maxed: overload drains hp.
         if (overloadActive && anxiety >= ANXIETY_MAX) {
             hp -= OVERLOAD_DPS * delta;
             if (hp <= 0f) {
@@ -323,7 +321,6 @@ public class Player {
                 pendingRespawn = true;
             }
         } else if (anxiety < ANXIETY_MAX) {
-            // Player dropped out of the peak, so it can trigger again next time.
             overloadActive = false;
         }
     }
@@ -410,73 +407,160 @@ public class Player {
             alpha = 0.4f + 0.6f * Math.abs(MathUtils.sin(invulnerableTimer * 20f));
         }
 
-        float cloakR = 0.15f, cloakG = 0.15f, cloakB = 0.20f;
-        float maskR = 0.85f, maskG = 0.85f, maskB = 0.80f;
-        float hornR = 0.65f, hornG = 0.65f, hornB = 0.60f;
-        float nailR = 0.75f, nailG = 0.75f, nailB = 0.70f;
+        float anxietyRatio = anxiety / ANXIETY_MAX;
+
+        float skinR = 0.62f, skinG = 0.48f, skinB = 0.38f;
+        float cloakR = 0.10f, cloakG = 0.10f, cloakB = 0.13f;
+        float cloakTrimR = 0.28f, cloakTrimG = 0.20f, cloakTrimB = 0.14f;
+        float leatherR = 0.22f, leatherG = 0.16f, leatherB = 0.12f;
+        float gloveR = 0.14f, gloveG = 0.11f, gloveB = 0.09f;
+        float hairR = 0.05f, hairG = 0.05f, hairB = 0.06f;
+
+        float coreR = GLOW_COLOR_R, coreG = GLOW_COLOR_G, coreB = GLOW_COLOR_B;
+        float glowAlpha = anxietyRatio * GLOW_ALPHA_MAX;
 
         shapeRenderer.begin(ShapeRenderer.ShapeType.Filled);
 
-        // Linear alpha so every point of anxiety is visibly brighter than the last.
-        float anxietyRatio = anxiety / ANXIETY_MAX;
-        float glowAlpha = anxietyRatio * GLOW_ALPHA_MAX;
-        if (glowAlpha > 0f) {
-            float glowX = centerX;
-            float glowY = bottomY + 30f;
-
-            shapeRenderer.setColor(GLOW_COLOR_R, GLOW_COLOR_G, GLOW_COLOR_B, glowAlpha * 0.5f);
-            shapeRenderer.circle(glowX, glowY, GLOW_OUTER_RADIUS);
-
-            shapeRenderer.setColor(GLOW_COLOR_R, GLOW_COLOR_G, GLOW_COLOR_B, glowAlpha);
-            shapeRenderer.circle(glowX, glowY, GLOW_INNER_RADIUS);
+        if (!attacking) {
+            drawSheathedSword(shapeRenderer, centerX, bottomY, alpha);
         }
 
+        // Cloak (short tattered cape behind the torso).
         shapeRenderer.setColor(cloakR, cloakG, cloakB, alpha);
-        shapeRenderer.rect(centerX - 15f, bottomY, 30f, 40f);
-
-        drawSword(shapeRenderer, centerX, bottomY, alpha, nailR, nailG, nailB);
-
-        shapeRenderer.setColor(maskR, maskG, maskB, alpha);
-        shapeRenderer.circle(centerX, bottomY + 48f, 14f);
-
-        shapeRenderer.setColor(hornR, hornG, hornB, alpha);
         shapeRenderer.triangle(
-            centerX - 12f, bottomY + 55f,
-            centerX - 4f, bottomY + 55f,
-            centerX - 10f, bottomY + 72f
+            centerX - 88f, bottomY + 48f,
+            centerX + 88f, bottomY + 48f,
+            centerX + 64f, bottomY + 208f
         );
         shapeRenderer.triangle(
-            centerX + 4f, bottomY + 55f,
-            centerX + 12f, bottomY + 55f,
-            centerX + 10f, bottomY + 72f
+            centerX - 88f, bottomY + 48f,
+            centerX + 64f, bottomY + 208f,
+            centerX - 64f, bottomY + 208f
         );
+        shapeRenderer.triangle(
+            centerX - 88f, bottomY + 48f,
+            centerX - 56f, bottomY - 16f,
+            centerX - 24f, bottomY + 32f
+        );
+        shapeRenderer.triangle(
+            centerX + 88f, bottomY + 48f,
+            centerX + 56f, bottomY - 16f,
+            centerX + 24f, bottomY + 32f
+        );
+
+        shapeRenderer.setColor(cloakTrimR, cloakTrimG, cloakTrimB, alpha);
+        shapeRenderer.rect(centerX - 68f, bottomY + 200f, 136f, 12f);
+
+        // Legs.
+        shapeRenderer.setColor(leatherR, leatherG, leatherB, alpha);
+        shapeRenderer.rect(centerX - 52f, bottomY, 40f, 88f);
+        shapeRenderer.rect(centerX + 12f, bottomY, 40f, 88f);
+
+        // Torso.
+        shapeRenderer.setColor(leatherR, leatherG, leatherB, alpha);
+        shapeRenderer.rect(centerX - 60f, bottomY + 80f, 120f, 112f);
+
+        // Chest strap.
+        shapeRenderer.setColor(leatherR * 0.7f, leatherG * 0.7f, leatherB * 0.7f, alpha);
+        shapeRenderer.rect(centerX - 56f, bottomY + 136f, 112f, 16f);
+
+        // Heart glow.
+        if (glowAlpha > 0.01f) {
+            float pulse = 1f + 0.15f * MathUtils.sin(anxiety * 0.4f);
+            shapeRenderer.setColor(coreR, coreG, coreB, glowAlpha * 0.35f);
+            shapeRenderer.circle(centerX, bottomY + 136f, 48f * pulse);
+            shapeRenderer.setColor(coreR, coreG, coreB, glowAlpha);
+            shapeRenderer.circle(centerX, bottomY + 136f, 20f * pulse);
+        }
+
+        // Shoulders.
+        shapeRenderer.setColor(leatherR, leatherG, leatherB, alpha);
+        shapeRenderer.rect(centerX - 80f, bottomY + 168f, 48f, 40f);
+        shapeRenderer.rect(centerX + 32f, bottomY + 168f, 48f, 40f);
+
+        // Arms.
+        shapeRenderer.setColor(skinR, skinG, skinB, alpha);
+        float armY = bottomY + 88f;
+        if (facingRight) {
+            shapeRenderer.rect(centerX + 56f, armY, 32f, 80f);
+            shapeRenderer.rect(centerX - 88f, armY + 16f, 32f, 64f);
+        } else {
+            shapeRenderer.rect(centerX - 88f, armY, 32f, 80f);
+            shapeRenderer.rect(centerX + 56f, armY + 16f, 32f, 64f);
+        }
+
+        // Gloves.
+        shapeRenderer.setColor(gloveR, gloveG, gloveB, alpha);
+        if (facingRight) {
+            shapeRenderer.rect(centerX + 56f, armY - 16f, 36f, 40f);
+            shapeRenderer.rect(centerX - 88f, armY, 36f, 40f);
+        } else {
+            shapeRenderer.rect(centerX - 92f, armY - 16f, 36f, 40f);
+            shapeRenderer.rect(centerX + 52f, armY, 36f, 40f);
+        }
+
+        // Head.
+        float headY = bottomY + 208f;
+        shapeRenderer.setColor(skinR, skinG, skinB, alpha);
+        shapeRenderer.rect(centerX - 36f, headY, 72f, 64f);
+
+        // Hair and beard.
+        shapeRenderer.setColor(hairR, hairG, hairB, alpha);
+        shapeRenderer.rect(centerX - 40f, headY + 48f, 80f, 24f);
+        shapeRenderer.rect(centerX - 40f, headY - 8f, 80f, 20f);
+
+        // Eyes.
+        shapeRenderer.setColor(0.9f, 0.75f, 0.35f, alpha);
+        if (facingRight) {
+            shapeRenderer.rect(centerX + 4f, headY + 24f, 12f, 12f);
+        } else {
+            shapeRenderer.rect(centerX - 16f, headY + 24f, 12f, 12f);
+        }
+
+        if (attacking) {
+            drawAttackSword(shapeRenderer, centerX, bottomY, alpha);
+        }
+
         shapeRenderer.end();
     }
 
-    private void drawSword(ShapeRenderer shapeRenderer,
-                           float centerX, float bottomY, float alpha,
-                           float r, float g, float b) {
-        shapeRenderer.setColor(r, g, b, alpha);
+    private void drawSheathedSword(ShapeRenderer shapeRenderer, float centerX, float bottomY, float alpha) {
+        shapeRenderer.setColor(0.18f, 0.12f, 0.08f, alpha);
+        float hx = centerX - 56f;
+        float hy = bottomY + 240f;
+        shapeRenderer.rect(hx, hy, 16f, 56f);
+        shapeRenderer.setColor(0.65f, 0.45f, 0.20f, alpha);
+        shapeRenderer.rect(hx - 4f, hy + 56f, 24f, 12f);
 
-        float handX = facingRight ? centerX + 12f : centerX - 12f;
-        float handY = bottomY + 22f;
+        shapeRenderer.setColor(0.55f, 0.58f, 0.62f, alpha);
+        shapeRenderer.rect(centerX - 48f, bottomY + 200f, 112f, 16f);
+        shapeRenderer.setColor(0.75f, 0.78f, 0.82f, alpha);
+        shapeRenderer.rect(centerX - 48f, bottomY + 208f, 112f, 4f);
 
-        if (!attacking) {
-            float x = facingRight ? handX : handX - 8f;
-            shapeRenderer.rect(x, handY - 4f, 8f, 25f);
-            return;
-        }
+        shapeRenderer.setColor(0.55f, 0.38f, 0.16f, alpha);
+        shapeRenderer.rect(centerX - 52f, bottomY + 196f, 20f, 20f);
+    }
+
+    private void drawAttackSword(ShapeRenderer shapeRenderer,
+                                 float centerX, float bottomY, float alpha) {
+        float shoulderX = facingRight ? centerX + 16f : centerX - 16f;
+        float shoulderY = bottomY + 184f;
 
         boolean windup = attackTimer > ATTACK_STRIKE;
 
         if (windup) {
-            float x = handX - 4f;
-            shapeRenderer.rect(x, bottomY + 40f, 8f, 40f);
+            shapeRenderer.setColor(0.60f, 0.63f, 0.68f, alpha);
+            shapeRenderer.rect(shoulderX - 12f, shoulderY + 48f, 24f, 160f);
+            shapeRenderer.setColor(0.80f, 0.82f, 0.86f, alpha);
+            shapeRenderer.rect(shoulderX - 8f, shoulderY + 48f, 8f, 160f);
         } else {
-            float reach = 40f;
-            float x = facingRight ? handX : handX - reach;
-            float y = bottomY + 5f;
-            shapeRenderer.rect(x, y, reach, 10f);
+            float reach = 240f;
+            float bladeY = bottomY + 16f;
+            float bladeX = facingRight ? centerX + 24f : centerX - 24f - reach;
+            shapeRenderer.setColor(0.62f, 0.65f, 0.70f, alpha);
+            shapeRenderer.rect(bladeX, bladeY, reach, 24f);
+            shapeRenderer.setColor(0.82f, 0.85f, 0.88f, alpha);
+            shapeRenderer.rect(bladeX, bladeY + 20f, reach, 8f);
         }
     }
 }

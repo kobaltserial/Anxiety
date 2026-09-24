@@ -40,7 +40,7 @@ public class GameScreen implements Screen {
 
     private static final int ENEMY_DAMAGE = 50;
     private static final int PLAYER_DAMAGE = 20;
-    private static final float ENEMY_SPEED = 80f;
+    private static final float ENEMY_SPEED = 320f;
 
     private static final float RUN_DUST_INTERVAL = 0.08f;
 
@@ -54,8 +54,8 @@ public class GameScreen implements Screen {
     private static final float ANXIETY_BAR_Y = 1230f;
     private static final float ANXIETY_BAR_HEIGHT = 40f;
 
-    private static final float ENEMY_HP_BAR_WIDTH = 100f;
-    private static final float ENEMY_HP_BAR_HEIGHT = 12f;
+    private static final float ENEMY_HP_BAR_WIDTH = 200f;
+    private static final float ENEMY_HP_BAR_HEIGHT = 24f;
 
     private float respawnX = 300f;
     private float respawnY = 300f;
@@ -209,8 +209,8 @@ public class GameScreen implements Screen {
             float speed = MathUtils.random(80f, 180f);
             particles.add(new Particle(
                 centerX, baseY,
-                dirX * speed, MathUtils.random(20f, 80f),
-                MathUtils.random(4f, 7f),
+                dirX * speed * 4f, MathUtils.random(80f, 320f),
+                MathUtils.random(16f, 28f),
                 MathUtils.random(0.25f, 0.4f),
                 0.75f, 0.75f, 0.70f
             ));
@@ -223,9 +223,9 @@ public class GameScreen implements Screen {
 
         float dirX = -Math.signum(player.getVelocityX());
         particles.add(new Particle(
-            centerX - dirX * 15f, baseY,
-            dirX * MathUtils.random(30f, 70f), MathUtils.random(10f, 40f),
-            MathUtils.random(3f, 5f),
+            centerX - dirX * 60f, baseY,
+            dirX * MathUtils.random(120f, 280f), MathUtils.random(40f, 160f),
+            MathUtils.random(12f, 20f),
             MathUtils.random(0.2f, 0.3f),
             0.6f, 0.6f, 0.55f
         ));
@@ -238,15 +238,15 @@ public class GameScreen implements Screen {
 
         for (int i = 0; i < 15; i++) {
             float t = i / 14f;
-            float offsetX = -dashDir * (10f + t * 45f);
-            float offsetY = MathUtils.random(-18f, 18f);
+            float offsetX = -dashDir * (40f + t * 180f);
+            float offsetY = MathUtils.random(-72f, 72f);
 
-            float size = MathUtils.random(3f, 6f) * (1f - t * 0.5f);
+            float size = MathUtils.random(12f, 24f) * (1f - t * 0.5f);
             float life = MathUtils.random(0.12f, 0.22f) * (1f - t * 0.4f);
 
             particles.add(new Particle(
                 centerX + offsetX, centerY + offsetY,
-                0f, MathUtils.random(-10f, 20f),
+                0f, MathUtils.random(-40f, 80f),
                 size,
                 life,
                 0.85f, 0.85f, 0.80f
@@ -260,13 +260,13 @@ public class GameScreen implements Screen {
 
         for (int i = 0; i < 8; i++) {
             float angle = MathUtils.random(0f, MathUtils.PI2);
-            float speed = MathUtils.random(60f, 160f);
+            float speed = MathUtils.random(240f, 640f);
 
             particles.add(new Particle(
                 cx, cy,
                 MathUtils.cos(angle) * speed,
                 MathUtils.sin(angle) * speed,
-                MathUtils.random(2f, 4f),
+                MathUtils.random(8f, 16f),
                 MathUtils.random(0.15f, 0.3f),
                 1f, 0.9f, 0.6f
             ));
@@ -352,12 +352,12 @@ public class GameScreen implements Screen {
             shapeRenderer.setColor(0.85f, 0.25f, 0.25f, 1f);
             shapeRenderer.rect(enemy.getX(), enemy.getY(), Enemy.SIZE, Enemy.SIZE);
 
-            float eyeY = enemy.getY() + Enemy.SIZE - 12f;
-            float eyeOffsetX = 8f;
+            float eyeY = enemy.getY() + Enemy.SIZE - 48f;
+            float eyeOffsetX = 32f;
             float eyeCenterX = enemy.getX() + Enemy.SIZE / 2f;
             shapeRenderer.setColor(1f, 1f, 1f, 1f);
-            shapeRenderer.circle(eyeCenterX - eyeOffsetX, eyeY, 3f);
-            shapeRenderer.circle(eyeCenterX + eyeOffsetX, eyeY, 3f);
+            shapeRenderer.circle(eyeCenterX - eyeOffsetX, eyeY, 12f);
+            shapeRenderer.circle(eyeCenterX + eyeOffsetX, eyeY, 12f);
         }
         shapeRenderer.end();
     }
