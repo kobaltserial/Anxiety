@@ -23,7 +23,8 @@ import java.util.Iterator;
 import java.util.List;
 
 /**
- * Main gameplay screen. Handles input, physics and rendering of the level.
+ * Main gameplay screen. Owns the level, enemies, particles, camera and HUD,
+ * and drives the player each frame.
  */
 public class GameScreen implements Screen {
 
@@ -35,35 +36,12 @@ public class GameScreen implements Screen {
     private static final float WORLD_WIDTH = 5120f;
     private static final float WORLD_HEIGHT = 720f;
 
-    private static final float PLAYER_SIZE = 50f;
-    private static final float MOVE_SPEED = 300f;
-    private static final float GRAVITY = -1500f;
-    private static final float JUMP_FORCE = 700f;
-
-    private static final float DASH_SPEED = 900f;
-    private static final float DASH_DURATION = 0.15f;
-    private static final float DASH_COOLDOWN = 0.4f;
-
-    // Attack is split into windup and strike, so the hitbox is active only
-    // during the strike phase. This makes the swing feel like a real hit.
-    private static final float ATTACK_WINDUP = 0.08f;
-    private static final float ATTACK_STRIKE = 0.12f;
-    private static final float ATTACK_TOTAL = ATTACK_WINDUP + ATTACK_STRIKE;
-    private static final float ATTACK_COOLDOWN = 0.35f;
-    private static final float ATTACK_WIDTH = 55f;
-    private static final float ATTACK_HEIGHT = 50f;
-
-    private static final int PLAYER_MAX_HP = 100;
     private static final int ENEMY_DAMAGE = 50;
     private static final int PLAYER_DAMAGE = 20;
-    private static final float PLAYER_INVULNERABLE_TIME = 1.2f;
-
     private static final float ENEMY_SPEED = 80f;
 
-    private static final float DEATH_Y = -100f;
     private static final float RUN_DUST_INTERVAL = 0.08f;
 
-    // HUD layout.
     private static final float HP_BAR_X = 20f;
     private static final float HP_BAR_Y = 660f;
     private static final float HP_BAR_WIDTH = 60f;
@@ -74,32 +52,11 @@ public class GameScreen implements Screen {
     private static final float ENEMY_HP_BAR_WIDTH = 50f;
     private static final float ENEMY_HP_BAR_HEIGHT = 6f;
 
-    private float playerX = 300f;
-    private float playerY = 300f;
-    private float velocityX = 0f;
-    private float velocityY = 0f;
-    private boolean isOnGround = false;
-    private boolean facingRight = true;
-
-    private int playerHp = PLAYER_MAX_HP;
-    private float playerInvulnerableTimer = 0f;
-
     private float respawnX = 300f;
     private float respawnY = 300f;
 
-    private boolean isDashing = false;
-    private float dashTimer = 0f;
-    private float dashCooldownTimer = 0f;
-    private float dashDirection = 1f;
-
-    private boolean isAttacking = false;
-    private float attackTimer = 0f;
-    private float attackCooldownTimer = 0f;
-    private float attackDirection = 1f;
-    private boolean attackHitApplied = false;
-
-    private boolean wasOnGroundLastFrame = false;
     private float runDustTimer = 0f;
+    private boolean wasOnGroundLastFrame = false;
 
     private final List<Platform> platforms = new ArrayList<>();
     private final List<Particle> particles = new ArrayList<>();
@@ -126,7 +83,7 @@ public class GameScreen implements Screen {
         hudCamera = new OrthographicCamera();
         hudCamera.setToOrtho(false, VIEWPORT_WIDTH, VIEWPORT_HEIGHT);
         hudCamera.update();
-        player = new Player(playerX, playerY);
+        player = new Player(300f, 300f);
         buildLevel();
     }
 
@@ -148,7 +105,6 @@ public class GameScreen implements Screen {
         enemies.add(new Enemy(3050, 450, 3000, 3180, 1f));
         enemies.add(new Enemy(4050, 300, 4000, 4150, -1f));
 
-        // Checkpoints: thin tall zones on the ground the player runs through.
         checkpoints.add(new Checkpoint(1000, 100, 40, 100, 1000, 150));
         checkpoints.add(new Checkpoint(2400, 100, 40, 100, 2400, 150));
         checkpoints.add(new Checkpoint(3800, 100, 40, 100, 3800, 150));
@@ -156,152 +112,36 @@ public class GameScreen implements Screen {
 
     @Override
     public void render(float delta) {
-        handleInput(delta);
-        applyPhysics(delta);
+        handleScreenInput();
+        player.update(delta, platforms);
+
+        if (player.isDashJustStarted()) {
+            emitDashTrail();
+            player.clearDashJustStarted();
+        }
+
+        if (player.isPendingRespawn()) {
+            respawnPlayer();
+        }
+
         updateEnemies(delta);
-        checkCombat(delta);
+        checkCombat();
         checkCheckpoints();
+        emitMovementParticles(delta);
         updateParticles(delta);
         updateCamera();
         draw();
     }
 
-    private void handleInput(float delta) {
-        if (Gdx.input.isKeyJustPressed(Input.Keys.SHIFT_LEFT)
-            || Gdx.input.isKeyJustPressed(Input.Keys.SHIFT_RIGHT)) {
-            tryStartDash();
-        }
-
-        if (Gdx.input.isKeyJustPressed(Input.Keys.P)) {
-            tryStartAttack();
-        }
-
-        if (!isDashing) {
-            velocityX = 0f;
-
-            if (Gdx.input.isKeyPressed(Input.Keys.LEFT) || Gdx.input.isKeyPressed(Input.Keys.A)) {
-                velocityX = -MOVE_SPEED;
-                facingRight = false;
-            }
-            if (Gdx.input.isKeyPressed(Input.Keys.RIGHT) || Gdx.input.isKeyPressed(Input.Keys.D)) {
-                velocityX = MOVE_SPEED;
-                facingRight = true;
-            }
-        }
-
-        if (Gdx.input.isKeyJustPressed(Input.Keys.SPACE) && isOnGround && !isDashing) {
-            velocityY = JUMP_FORCE;
-            isOnGround = false;
-        }
-
+    private void handleScreenInput() {
         if (Gdx.input.isKeyJustPressed(Input.Keys.ESCAPE)) {
             game.setScreen(new PauseScreen(game, this));
         }
     }
 
-    private void tryStartDash() {
-        if (isDashing) return;
-        if (dashCooldownTimer > 0f) return;
-
-        isDashing = true;
-        dashTimer = DASH_DURATION;
-        dashCooldownTimer = DASH_COOLDOWN;
-        dashDirection = facingRight ? 1f : -1f;
-
-        emitDashTrail();
-    }
-
-    private void tryStartAttack() {
-        if (isAttacking) return;
-        if (attackCooldownTimer > 0f) return;
-
-        isAttacking = true;
-        attackTimer = ATTACK_TOTAL;
-        attackCooldownTimer = ATTACK_COOLDOWN;
-        attackDirection = facingRight ? 1f : -1f;
-        attackHitApplied = false;
-
-        emitAttackSpark();
-    }
-
-    private void applyPhysics(float delta) {
-        if (dashCooldownTimer > 0f) dashCooldownTimer -= delta;
-        if (attackCooldownTimer > 0f) attackCooldownTimer -= delta;
-        if (playerInvulnerableTimer > 0f) playerInvulnerableTimer -= delta;
-
-        if (isAttacking) {
-            attackTimer -= delta;
-            if (attackTimer <= 0f) {
-                isAttacking = false;
-            }
-        }
-
-        if (isDashing) {
-            dashTimer -= delta;
-
-            velocityX = DASH_SPEED * dashDirection;
-            velocityY = 0f;
-
-            if (dashTimer <= 0f) {
-                isDashing = false;
-                velocityX = 0f;
-            }
-        } else {
-            velocityY += GRAVITY * delta;
-        }
-
-        playerX += velocityX * delta;
-        resolveX();
-
-        playerY += velocityY * delta;
-        resolveY();
-
-        emitMovementParticles(delta);
-
-        if (playerY < DEATH_Y) {
-            killPlayer();
-        }
-        player.updatePosition(playerX, playerY);
-    }
-
-    private void resolveX() {
-        Rectangle player = playerBounds();
-
-        for (Platform platform : platforms) {
-            Rectangle bounds = platform.getBounds();
-            if (!player.overlaps(bounds)) continue;
-
-            if (velocityX > 0) {
-                playerX = bounds.x - PLAYER_SIZE;
-            } else if (velocityX < 0) {
-                playerX = bounds.x + bounds.width;
-            }
-            player.setPosition(playerX, playerY);
-
-            if (isDashing) {
-                isDashing = false;
-                velocityX = 0f;
-            }
-        }
-    }
-
-    private void resolveY() {
-        Rectangle player = playerBounds();
-        isOnGround = false;
-
-        for (Platform platform : platforms) {
-            Rectangle bounds = platform.getBounds();
-            if (!player.overlaps(bounds)) continue;
-
-            if (velocityY <= 0) {
-                playerY = bounds.y + bounds.height;
-                isOnGround = true;
-            } else {
-                playerY = bounds.y - PLAYER_SIZE;
-            }
-            velocityY = 0f;
-            player.setPosition(playerX, playerY);
-        }
+    private void respawnPlayer() {
+        player.respawn(respawnX, respawnY);
+        particles.clear();
     }
 
     private void updateEnemies(float delta) {
@@ -311,65 +151,39 @@ public class GameScreen implements Screen {
         enemies.removeIf(Enemy::isDead);
     }
 
-    private void checkCombat(float delta) {
-        Rectangle player = playerBounds();
-        boolean strikeActive = isAttacking && attackTimer <= ATTACK_STRIKE;
+    private void checkCombat() {
+        Rectangle playerBounds = player.bounds();
 
-        if (strikeActive && !attackHitApplied) {
-            Rectangle attack = attackBounds();
+        if (player.isStrikeActive() && !player.isAttackHitApplied()) {
+            Rectangle attack = player.attackBounds();
 
             for (Enemy enemy : enemies) {
                 if (attack.overlaps(enemy.bounds())) {
                     enemy.takeDamage(ENEMY_DAMAGE);
                     emitAttackHit(enemy);
-                    attackHitApplied = true;
+                    player.markAttackHitApplied();
                     break;
                 }
             }
         }
 
-        if (playerInvulnerableTimer > 0f) return;
+        if (player.getInvulnerableTimer() > 0f) return;
 
         for (Enemy enemy : enemies) {
-            if (player.overlaps(enemy.bounds())) {
-                damagePlayer(PLAYER_DAMAGE);
+            if (playerBounds.overlaps(enemy.bounds())) {
+                player.takeDamage(PLAYER_DAMAGE);
                 return;
             }
         }
     }
 
-    private void damagePlayer(int amount) {
-        playerHp -= amount;
-        playerInvulnerableTimer = PLAYER_INVULNERABLE_TIME;
-
-        if (playerHp <= 0) {
-            playerHp = 0;
-            killPlayer();
-        }
-    }
-
-    private void killPlayer() {
-        playerHp = PLAYER_MAX_HP;
-        playerX = respawnX;
-        playerY = respawnY;
-        velocityX = 0f;
-        velocityY = 0f;
-        isOnGround = false;
-        isDashing = false;
-        isAttacking = false;
-        dashCooldownTimer = 0f;
-        attackCooldownTimer = 0f;
-        playerInvulnerableTimer = 0f;
-        particles.clear();
-    }
-
     private void checkCheckpoints() {
-        Rectangle player = playerBounds();
+        Rectangle playerBounds = player.bounds();
 
         for (Checkpoint checkpoint : checkpoints) {
             if (checkpoint.isActivated()) continue;
 
-            if (player.overlaps(checkpoint.getBounds())) {
+            if (playerBounds.overlaps(checkpoint.getBounds())) {
                 checkpoint.activate();
                 respawnX = checkpoint.getRespawnX();
                 respawnY = checkpoint.getRespawnY();
@@ -377,23 +191,12 @@ public class GameScreen implements Screen {
         }
     }
 
-    private Rectangle playerBounds() {
-        return new Rectangle(playerX, playerY, PLAYER_SIZE, PLAYER_SIZE);
-    }
-
-    private Rectangle attackBounds() {
-        float centerY = playerY + PLAYER_SIZE / 2f;
-        float x = attackDirection > 0 ? playerX + PLAYER_SIZE : playerX - ATTACK_WIDTH;
-        float y = centerY - ATTACK_HEIGHT / 2f;
-        return new Rectangle(x, y, ATTACK_WIDTH, ATTACK_HEIGHT);
-    }
-
     private void emitMovementParticles(float delta) {
-        if (isOnGround && !wasOnGroundLastFrame) {
+        if (player.justLanded()) {
             emitLandingDust();
         }
 
-        if (isOnGround && Math.abs(velocityX) > 1f && !isDashing) {
+        if (player.isOnGround() && Math.abs(player.getVelocityX()) > 1f && !player.isDashing()) {
             runDustTimer -= delta;
             if (runDustTimer <= 0f) {
                 runDustTimer = RUN_DUST_INTERVAL;
@@ -403,12 +206,16 @@ public class GameScreen implements Screen {
             runDustTimer = 0f;
         }
 
-        wasOnGroundLastFrame = isOnGround;
+        if (player.isDashing() && player.wasOnGroundLastFrame() && !wasOnGroundLastFrame) {
+            // no-op; placeholder for future dash-on-ground particles
+        }
+
+        wasOnGroundLastFrame = player.isOnGround();
     }
 
     private void emitLandingDust() {
-        float centerX = playerX + PLAYER_SIZE / 2f;
-        float baseY = playerY;
+        float centerX = player.getCenterX();
+        float baseY = player.getY();
 
         for (int i = 0; i < 6; i++) {
             float dirX = MathUtils.random(-1f, 1f);
@@ -424,10 +231,10 @@ public class GameScreen implements Screen {
     }
 
     private void emitRunDust() {
-        float centerX = playerX + PLAYER_SIZE / 2f;
-        float baseY = playerY;
+        float centerX = player.getCenterX();
+        float baseY = player.getY();
 
-        float dirX = -Math.signum(velocityX);
+        float dirX = -Math.signum(player.getVelocityX());
         particles.add(new Particle(
             centerX - dirX * 15f, baseY,
             dirX * MathUtils.random(30f, 70f), MathUtils.random(10f, 40f),
@@ -438,12 +245,13 @@ public class GameScreen implements Screen {
     }
 
     private void emitDashTrail() {
-        float centerX = playerX + PLAYER_SIZE / 2f;
-        float centerY = playerY + PLAYER_SIZE / 2f;
+        float centerX = player.getCenterX();
+        float centerY = player.getCenterY();
+        float dashDir = player.isFacingRight() ? 1f : -1f;
 
         for (int i = 0; i < 15; i++) {
             float t = i / 14f;
-            float offsetX = -dashDirection * (10f + t * 45f);
+            float offsetX = -dashDir * (10f + t * 45f);
             float offsetY = MathUtils.random(-18f, 18f);
 
             float size = MathUtils.random(3f, 6f) * (1f - t * 0.5f);
@@ -459,31 +267,10 @@ public class GameScreen implements Screen {
         }
     }
 
-    private void emitAttackSpark() {
-        float centerX = playerX + PLAYER_SIZE / 2f;
-        float centerY = playerY + PLAYER_SIZE / 2f;
-
-        float baseX = centerX + attackDirection * 25f;
-
-        for (int i = 0; i < 6; i++) {
-            float dirX = attackDirection * MathUtils.random(60f, 160f);
-            float dirY = MathUtils.random(-60f, 60f);
-
-            particles.add(new Particle(
-                baseX, centerY + MathUtils.random(-15f, 15f),
-                dirX, dirY,
-                MathUtils.random(2f, 4f),
-                MathUtils.random(0.1f, 0.2f),
-                1f, 1f, 0.9f
-            ));
-        }
-    }
-
     private void emitAttackHit(Enemy enemy) {
         float cx = enemy.getX() + Enemy.SIZE / 2f;
         float cy = enemy.getY() + Enemy.SIZE / 2f;
 
-        // Bright flash on hit, smaller than death burst so it reads as "damaged, not dead".
         for (int i = 0; i < 8; i++) {
             float angle = MathUtils.random(0f, MathUtils.PI2);
             float speed = MathUtils.random(60f, 160f);
@@ -495,25 +282,6 @@ public class GameScreen implements Screen {
                 MathUtils.random(2f, 4f),
                 MathUtils.random(0.15f, 0.3f),
                 1f, 0.9f, 0.6f
-            ));
-        }
-    }
-
-    private void emitEnemyDeath(Enemy enemy) {
-        float cx = enemy.getX() + Enemy.SIZE / 2f;
-        float cy = enemy.getY() + Enemy.SIZE / 2f;
-
-        for (int i = 0; i < 18; i++) {
-            float angle = MathUtils.random(0f, MathUtils.PI2);
-            float speed = MathUtils.random(80f, 220f);
-
-            particles.add(new Particle(
-                cx, cy,
-                MathUtils.cos(angle) * speed,
-                MathUtils.sin(angle) * speed,
-                MathUtils.random(3f, 6f),
-                MathUtils.random(0.25f, 0.5f),
-                0.9f, 0.35f, 0.35f
             ));
         }
     }
@@ -530,8 +298,8 @@ public class GameScreen implements Screen {
     }
 
     private void updateCamera() {
-        float targetX = playerX + PLAYER_SIZE / 2f;
-        float targetY = playerY + PLAYER_SIZE / 2f;
+        float targetX = player.getCenterX();
+        float targetY = player.getCenterY();
 
         float visibleHalfWidth = camera.viewportWidth / 2f * camera.zoom;
         float visibleHalfHeight = camera.viewportHeight / 2f * camera.zoom;
@@ -612,14 +380,13 @@ public class GameScreen implements Screen {
     }
 
     private void drawPlayer() {
-        float centerX = playerX + PLAYER_SIZE / 2f;
-        float bottomY = playerY;
+        float centerX = player.getCenterX();
+        float bottomY = player.getY();
 
-        // While invulnerable, blink so the player can read the damage state.
         float alpha = 1f;
-        if (isDashing) alpha = 0.6f;
-        if (playerInvulnerableTimer > 0f) {
-            alpha = 0.4f + 0.6f * Math.abs(MathUtils.sin(playerInvulnerableTimer * 20f));
+        if (player.isDashing()) alpha = 0.6f;
+        if (player.getInvulnerableTimer() > 0f) {
+            alpha = 0.4f + 0.6f * Math.abs(MathUtils.sin(player.getInvulnerableTimer() * 20f));
         }
 
         float cloakR = 0.15f, cloakG = 0.15f, cloakB = 0.20f;
@@ -650,32 +417,25 @@ public class GameScreen implements Screen {
         shapeRenderer.end();
     }
 
-    /**
-     * Draws the nail in one of three states: idle (hanging at the side),
-     * windup (raised above the head) or strike (slammed forward and down).
-     */
     private void drawSword(float centerX, float bottomY, float alpha, float r, float g, float b) {
         shapeRenderer.setColor(r, g, b, alpha);
 
+        boolean facingRight = player.isFacingRight();
         float handX = facingRight ? centerX + 12f : centerX - 12f;
         float handY = bottomY + 22f;
 
-        if (!isAttacking) {
-            // Idle: short blade resting at the side.
+        if (!player.isAttacking()) {
             float x = facingRight ? handX : handX - 8f;
             shapeRenderer.rect(x, handY - 4f, 8f, 25f);
             return;
         }
 
-        float progress = 1f - attackTimer / ATTACK_TOTAL;
-        boolean windup = attackTimer > ATTACK_STRIKE;
+        boolean windup = player.getAttackTimer() > 0.12f;
 
         if (windup) {
-            // Windup: blade straight up, slightly behind the head.
-            float x = facingRight ? handX - 4f : handX - 4f;
+            float x = handX - 4f;
             shapeRenderer.rect(x, bottomY + 40f, 8f, 40f);
         } else {
-            // Strike: blade slams forward and down.
             float reach = 40f;
             float x = facingRight ? handX : handX - reach;
             float y = bottomY + 5f;
@@ -689,11 +449,9 @@ public class GameScreen implements Screen {
             float barX = enemy.getX() + Enemy.SIZE / 2f - ENEMY_HP_BAR_WIDTH / 2f;
             float barY = enemy.getY() + Enemy.SIZE + 8f;
 
-            // Background.
             shapeRenderer.setColor(0.15f, 0.15f, 0.15f, 0.9f);
             shapeRenderer.rect(barX - 1f, barY - 1f, ENEMY_HP_BAR_WIDTH + 2f, ENEMY_HP_BAR_HEIGHT + 2f);
 
-            // Foreground scaled by hp.
             float fraction = enemy.getHp() / (float) Enemy.MAX_HP;
             shapeRenderer.setColor(0.9f, 0.2f, 0.2f, 1f);
             shapeRenderer.rect(barX, barY, ENEMY_HP_BAR_WIDTH * fraction, ENEMY_HP_BAR_HEIGHT);
@@ -704,12 +462,11 @@ public class GameScreen implements Screen {
     private void drawPlayerHud() {
         shapeRenderer.begin(ShapeType.Filled);
 
-        int barsToFill = (int) Math.ceil(playerHp / 20f);
+        int barsToFill = (int) Math.ceil(player.getHp() / 20f);
 
         for (int i = 0; i < HP_BARS_COUNT; i++) {
             float x = HP_BAR_X + i * (HP_BAR_WIDTH + HP_BAR_GAP);
 
-            // Background of each segment.
             shapeRenderer.setColor(0.15f, 0.15f, 0.15f, 0.8f);
             shapeRenderer.rect(x - 2f, HP_BAR_Y - 2f, HP_BAR_WIDTH + 4f, HP_BAR_HEIGHT + 4f);
 
@@ -721,17 +478,12 @@ public class GameScreen implements Screen {
             shapeRenderer.rect(x, HP_BAR_Y, HP_BAR_WIDTH, HP_BAR_HEIGHT);
         }
 
-        // HP number to the right of the bars.
         float numberX = HP_BAR_X + HP_BARS_COUNT * (HP_BAR_WIDTH + HP_BAR_GAP) + 12f;
-        drawNumber(playerHp, numberX, HP_BAR_Y + HP_BAR_HEIGHT / 2f, 12f);
+        drawNumber(player.getHp(), numberX, HP_BAR_Y + HP_BAR_HEIGHT / 2f, 12f);
 
         shapeRenderer.end();
     }
 
-    /**
-     * Draws an integer using seven-segment style digits made from rectangles.
-     * Replaces a bitmap font for now; will be swapped for a proper font later.
-     */
     private void drawNumber(int value, float x, float centerY, float digitWidth) {
         String digits = Integer.toString(value);
         float digitHeight = digitWidth * 1.8f;
@@ -747,11 +499,6 @@ public class GameScreen implements Screen {
         }
     }
 
-    /**
-     * Seven-segment digit layout. Each bit in the segment table decides
-     * whether the corresponding bar is drawn.
-     * Segments order: top, top-left, top-right, middle, bottom-left, bottom-right, bottom.
-     */
     private void drawDigit(int digit, float x, float centerY, float w, float h, float t) {
         boolean[] segments = SEVEN_SEGMENT[digit];
 
@@ -761,34 +508,26 @@ public class GameScreen implements Screen {
 
         shapeRenderer.setColor(0.95f, 0.95f, 0.9f, 1f);
 
-        // top
         if (segments[0]) shapeRenderer.rect(x, top - t, w, t);
-        // top-left
         if (segments[1]) shapeRenderer.rect(x, mid, t, h / 2f);
-        // top-right
         if (segments[2]) shapeRenderer.rect(x + w - t, mid, t, h / 2f);
-        // middle
         if (segments[3]) shapeRenderer.rect(x, mid - t / 2f, w, t);
-        // bottom-left
         if (segments[4]) shapeRenderer.rect(x, bottom, t, h / 2f);
-        // bottom-right
         if (segments[5]) shapeRenderer.rect(x + w - t, bottom, t, h / 2f);
-        // bottom
         if (segments[6]) shapeRenderer.rect(x, bottom, w, t);
     }
 
     private static final boolean[][] SEVEN_SEGMENT = {
-        //      top    tl     tr     mid    bl     br     bot
-        { true,  true,  true,  false, true,  true,  true  }, // 0
-        { false, false, true,  false, false, true,  false }, // 1
-        { true,  false, true,  true,  true,  false, true  }, // 2
-        { true,  false, true,  true,  false, true,  true  }, // 3
-        { false, true,  true,  true,  false, true,  false }, // 4
-        { true,  true,  false, true,  false, true,  true  }, // 5
-        { true,  true,  false, true,  true,  true,  true  }, // 6
-        { true,  false, true,  false, false, true,  false }, // 7
-        { true,  true,  true,  true,  true,  true,  true  }, // 8
-        { true,  true,  true,  true,  false, true,  true  }, // 9
+        { true,  true,  true,  false, true,  true,  true  },
+        { false, false, true,  false, false, true,  false },
+        { true,  false, true,  true,  true,  false, true  },
+        { true,  false, true,  true,  false, true,  true  },
+        { false, true,  true,  true,  false, true,  false },
+        { true,  true,  false, true,  false, true,  true  },
+        { true,  true,  false, true,  true,  true,  true  },
+        { true,  false, true,  false, false, true,  false },
+        { true,  true,  true,  true,  true,  true,  true  },
+        { true,  true,  true,  true,  false, true,  true  },
     };
 
     @Override
@@ -797,14 +536,9 @@ public class GameScreen implements Screen {
         viewport.update(width, height, false);
     }
 
-    @Override
-    public void pause() {}
-
-    @Override
-    public void resume() {}
-
-    @Override
-    public void hide() {}
+    @Override public void pause() {}
+    @Override public void resume() {}
+    @Override public void hide() {}
 
     @Override
     public void dispose() {
