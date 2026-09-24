@@ -4,18 +4,19 @@ import com.badlogic.gdx.math.Rectangle;
 
 /**
  * Patrolling enemy that walks back and forth on a platform.
- * Flips direction when its edge would leave the platform or hit a wall.
+ * Has HP and can be damaged by the player's melee attack.
  */
 public class Enemy {
 
     public static final float SIZE = 40f;
+    public static final int MAX_HP = 100;
 
     private float x;
     private float y;
     private final float platformMinX;
     private final float platformMaxX;
     private float direction;
-    private boolean alive = true;
+    private int hp = MAX_HP;
 
     public Enemy(float x, float y, float platformMinX, float platformMaxX, float direction) {
         this.x = x;
@@ -28,7 +29,6 @@ public class Enemy {
     public void update(float delta, float speed) {
         x += direction * speed * delta;
 
-        // Turn around at the platform edges so the enemy never walks off.
         if (x <= platformMinX) {
             x = platformMinX;
             direction = 1f;
@@ -36,6 +36,14 @@ public class Enemy {
             x = platformMaxX - SIZE;
             direction = -1f;
         }
+    }
+
+    public void takeDamage(int amount) {
+        hp = Math.max(0, hp - amount);
+    }
+
+    public boolean isDead() {
+        return hp <= 0;
     }
 
     public Rectangle bounds() {
@@ -50,11 +58,7 @@ public class Enemy {
         return y;
     }
 
-    public boolean isAlive() {
-        return alive;
-    }
-
-    public void kill() {
-        alive = false;
+    public int getHp() {
+        return hp;
     }
 }
